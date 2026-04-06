@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from PySide6.QtCore import QRectF, Qt, Signal
+from PySide6.QtCore import QRectF, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QPaintEvent, QPen
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
@@ -38,25 +38,24 @@ class BoardWidget(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
 
-        self._board: dict[str, str | None] = self._create_empty_board()
+        self._board: dict[str, str | None] = self.create_empty_board()
         self._selected_square: str | None = None
         self._highlight_squares: set[str] = set()
 
-        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        self.setMinimumSize(self.sizeHint())
+        # 盤面はウィンドウサイズに合わせて拡縮できる方が自然
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.setMinimumSize(self.minimumSizeHint())
         self.setMouseTracking(True)
 
-    def sizeHint(self):
+    def sizeHint(self) -> QSize:
         board_px = self.BOARD_SIZE * self.DEFAULT_SQUARE_SIZE
-        width = self.LABEL_MARGIN_LEFT + board_px + self.LABEL_MARGIN_RIGHT
-        height = self.LABEL_MARGIN_TOP + board_px + self.LABEL_MARGIN_BOTTOM
-        return super().sizeHint().expandedTo(self.minimumSizeHint()).grownBy(
-            self.contentsMargins()
+        return QSize(
+            self.LABEL_MARGIN_LEFT + board_px + self.LABEL_MARGIN_RIGHT,
+            self.LABEL_MARGIN_TOP + board_px + self.LABEL_MARGIN_BOTTOM,
         )
 
-    def minimumSizeHint(self):
+    def minimumSizeHint(self) -> QSize:
         board_px = self.BOARD_SIZE * self.DEFAULT_SQUARE_SIZE
-        from PySide6.QtCore import QSize
         return QSize(
             self.LABEL_MARGIN_LEFT + board_px + self.LABEL_MARGIN_RIGHT,
             self.LABEL_MARGIN_TOP + board_px + self.LABEL_MARGIN_BOTTOM,
@@ -170,7 +169,6 @@ class BoardWidget(QWidget):
         board_rect = self._board_rect()
         square_size = self._square_size()
 
-        # 合法手候補
         for square in self._highlight_squares:
             pos = self._square_to_index(square)
             if pos is None:
@@ -184,7 +182,6 @@ class BoardWidget(QWidget):
             )
             painter.fillRect(rect, QColor(100, 180, 255, 90))
 
-        # 選択中マス
         if self._selected_square is not None:
             pos = self._square_to_index(self._selected_square)
             if pos is not None:
@@ -249,7 +246,7 @@ class BoardWidget(QWidget):
         return min(available_w, available_h) / self.BOARD_SIZE
 
     @classmethod
-    def _create_empty_board(cls) -> dict[str, str | None]:
+    def create_empty_board(cls) -> dict[str, str | None]:
         board: dict[str, str | None] = {}
         for row in range(cls.BOARD_SIZE):
             for col in range(cls.BOARD_SIZE):
@@ -318,7 +315,7 @@ if __name__ == "__main__":
         "1f": "K",
     }
 
-    full_board = BoardWidget._create_empty_board()
+    full_board = BoardWidget.create_empty_board()
     full_board.update(sample_board)
 
     widget.set_board(full_board)

@@ -12,127 +12,57 @@ BOARD_SIZE = 6
 PROMOTION_ZONE_RANKS = 2
 
 
-def generate_legal_moves_from(position: Position, square: str) -> list[Move]:
+def generate_legal_moves_from(
+    position: Position,
+    square: str,
+    side_override: str | None = None,
+) -> list[Move]:
+    piece = position.get_piece_at(square)
+    if piece is None:
+        return []
+
+    moving_side = get_piece_side(piece)
+    target_side = position.side_to_move if side_override is None else side_override
+
+    if moving_side != target_side:
+        return []
+
+    pseudo_moves = generate_pseudo_legal_moves_from(
+        position=position,
+        square=square,
+        side_override=target_side,
+    )
+
+    legal_moves: list[Move] = []
+    for move in pseudo_moves:
+        if _is_legal_after_move(position, move, moving_side):
+            legal_moves.append(move)
+
+    return _dedupe_moves(legal_moves)
+
+
+def generate_pseudo_legal_moves_from(
+    position: Position,
+    square: str,
+    side_override: str | None = None,
+) -> list[Move]:
     piece = position.get_piece_at(square)
     if piece is None:
         return []
 
     side = get_piece_side(piece)
-    if side != position.side_to_move:
-        return []
+    target_side = position.side_to_move if side_override is None else side_override
 
-    base_piece = get_base_piece(piece)
-    promoted = is_promoted(piece)
+    if side != target_side:
+        return []
 
     row_col = square_to_index(square)
     if row_col is None:
         return []
 
     row, col = row_col
-    moves: list[Move] = []
-
-    if promoted and base_piece in {"P", "S", "N", "L"}:
-        destinations = _step_destinations(position, row, col, _gold_directions(side))
-        moves.extend(_moves_with_promotion(position, square, piece, destinations))
-        return _dedupe_moves(moves)
-
-    if promoted and base_piece == "R":
-        rook_dests = _slide_destinations(
-            position,
-            row,
-            col,
-            [(-1, 0), (1, 0), (0, -1), (0, 1)],
-        )
-        king_diag_dests = _step_destinations(
-            position,
-            row,
-            col,
-            [(-1, -1), (-1, 1), (1, -1), (1, 1)],
-        )
-        moves.extend(_moves_with_promotion(position, square, piece, rook_dests))
-        moves.extend(_moves_with_promotion(position, square, piece, king_diag_dests))
-        return _dedupe_moves(moves)
-
-    if promoted and base_piece == "B":
-        bishop_dests = _slide_destinations(
-            position,
-            row,
-            col,
-            [(-1, -1), (-1, 1), (1, -1), (1, 1)],
-        )
-        king_orth_dests = _step_destinations(
-            position,
-            row,
-            col,
-            [(-1, 0), (1, 0), (0, -1), (0, 1)],
-        )
-        moves.extend(_moves_with_promotion(position, square, piece, bishop_dests))
-        moves.extend(_moves_with_promotion(position, square, piece, king_orth_dests))
-        return _dedupe_moves(moves)
-
-    if base_piece == "K":
-        destinations = _step_destinations(
-            position,
-            row,
-            col,
-            [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)],
-        )
-        moves.extend(_moves_with_promotion(position, square, piece, destinations))
-        return _dedupe_moves(moves)
-
-    if base_piece == "G":
-        destinations = _step_destinations(position, row, col, _gold_directions(side))
-        moves.extend(_moves_with_promotion(position, square, piece, destinations))
-        return _dedupe_moves(moves)
-
-    if base_piece == "S":
-        directions = _forward_relative_dirs(
-            side,
-            [(-1, -1), (-1, 0), (-1, 1), (1, -1), (1, 1)],
-        )
-        destinations = _step_destinations(position, row, col, directions)
-        moves.extend(_moves_with_promotion(position, square, piece, destinations))
-        return _dedupe_moves(moves)
-
-    if base_piece == "N":
-        directions = _forward_relative_dirs(side, [(-2, -1), (-2, 1)])
-        destinations = _step_destinations(position, row, col, directions)
-        moves.extend(_moves_with_promotion(position, square, piece, destinations))
-        return _dedupe_moves(moves)
-
-    if base_piece == "L":
-        directions = _forward_relative_dirs(side, [(-1, 0)])
-        destinations = _slide_destinations(position, row, col, directions)
-        moves.extend(_moves_with_promotion(position, square, piece, destinations))
-        return _dedupe_moves(moves)
-
-    if base_piece == "P":
-        directions = _forward_relative_dirs(side, [(-1, 0)])
-        destinations = _step_destinations(position, row, col, directions)
-        moves.extend(_moves_with_promotion(position, square, piece, destinations))
-        return _dedupe_moves(moves)
-
-    if base_piece == "R":
-        destinations = _slide_destinations(
-            position,
-            row,
-            col,
-            [(-1, 0), (1, 0), (0, -1), (0, 1)],
-        )
-        moves.extend(_moves_with_promotion(position, square, piece, destinations))
-        return _dedupe_moves(moves)
-
-    if base_piece == "B":
-        destinations = _slide_destinations(
-            position,
-            row,
-            col,
-            [(-1, -1), (-1, 1), (1, -1), (1, 1)],
-        )
-        moves.extend(_moves_with_promotion(position, square, piece, destinations))
-        return _dedupe_moves(moves)
-
-    return []
+    destinations = _destinations_for_piece(position, row, col, piece)
+    return _moves_with_promotion(position, square, piece, destinations)
 
 
 def get_all_legal_moves(position: Position, side: str | None = None) -> list[Move]:
@@ -144,9 +74,60 @@ def get_all_legal_moves(position: Position, side: str | None = None) -> list[Mov
             continue
         if get_piece_side(piece) != target_side:
             continue
-        moves.extend(generate_legal_moves_from(position, square))
+        moves.extend(generate_legal_moves_from(position, square, side_override=target_side))
 
     return _dedupe_moves(moves)
+
+
+def find_king_square(position: Position, side: str) -> str | None:
+    for square, piece in position.board.items():
+        if piece is None:
+            continue
+        if get_piece_side(piece) != side:
+            continue
+        if get_base_piece(piece) == "K":
+            return square
+    return None
+
+
+def is_in_check(position: Position, side: str) -> bool:
+    king_square = find_king_square(position, side)
+    if king_square is None:
+        return True
+
+    opponent = "white" if side == "black" else "black"
+
+    for square, piece in position.board.items():
+        if piece is None:
+            continue
+        if get_piece_side(piece) != opponent:
+            continue
+
+        attacks = get_attack_squares_from(position, square)
+        if king_square in attacks:
+            return True
+
+    return False
+
+
+def is_checkmate(position: Position, side: str) -> bool:
+    if not is_in_check(position, side):
+        return False
+
+    return len(get_all_legal_moves(position, side)) == 0
+
+
+def get_attack_squares_from(position: Position, square: str) -> list[str]:
+    piece = position.get_piece_at(square)
+    if piece is None:
+        return []
+
+    row_col = square_to_index(square)
+    if row_col is None:
+        return []
+
+    row, col = row_col
+    return _destinations_for_piece(position, row, col, piece)
 
 
 def can_promote_move(position: Position, move: Move) -> bool:
@@ -282,6 +263,105 @@ def index_to_square(row: int, col: int) -> str:
     return f"{file_num}{rank_char}"
 
 
+def _destinations_for_piece(
+    position: Position,
+    row: int,
+    col: int,
+    piece: str,
+) -> list[str]:
+    side = get_piece_side(piece)
+    base_piece = get_base_piece(piece)
+    promoted = is_promoted(piece)
+
+    if promoted and base_piece in {"P", "S", "N", "L"}:
+        return _step_destinations(position, row, col, piece, _gold_directions(side))
+
+    if promoted and base_piece == "R":
+        rook_dests = _slide_destinations(
+            position,
+            row,
+            col,
+            piece,
+            [(-1, 0), (1, 0), (0, -1), (0, 1)],
+        )
+        king_diag_dests = _step_destinations(
+            position,
+            row,
+            col,
+            piece,
+            [(-1, -1), (-1, 1), (1, -1), (1, 1)],
+        )
+        return rook_dests + king_diag_dests
+
+    if promoted and base_piece == "B":
+        bishop_dests = _slide_destinations(
+            position,
+            row,
+            col,
+            piece,
+            [(-1, -1), (-1, 1), (1, -1), (1, 1)],
+        )
+        king_orth_dests = _step_destinations(
+            position,
+            row,
+            col,
+            piece,
+            [(-1, 0), (1, 0), (0, -1), (0, 1)],
+        )
+        return bishop_dests + king_orth_dests
+
+    if base_piece == "K":
+        return _step_destinations(
+            position,
+            row,
+            col,
+            piece,
+            [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)],
+        )
+
+    if base_piece == "G":
+        return _step_destinations(position, row, col, piece, _gold_directions(side))
+
+    if base_piece == "S":
+        directions = _forward_relative_dirs(
+            side,
+            [(-1, -1), (-1, 0), (-1, 1), (1, -1), (1, 1)],
+        )
+        return _step_destinations(position, row, col, piece, directions)
+
+    if base_piece == "N":
+        directions = _forward_relative_dirs(side, [(-2, -1), (-2, 1)])
+        return _step_destinations(position, row, col, piece, directions)
+
+    if base_piece == "L":
+        directions = _forward_relative_dirs(side, [(-1, 0)])
+        return _slide_destinations(position, row, col, piece, directions)
+
+    if base_piece == "P":
+        directions = _forward_relative_dirs(side, [(-1, 0)])
+        return _step_destinations(position, row, col, piece, directions)
+
+    if base_piece == "R":
+        return _slide_destinations(
+            position,
+            row,
+            col,
+            piece,
+            [(-1, 0), (1, 0), (0, -1), (0, 1)],
+        )
+
+    if base_piece == "B":
+        return _slide_destinations(
+            position,
+            row,
+            col,
+            piece,
+            [(-1, -1), (-1, 1), (1, -1), (1, 1)],
+        )
+
+    return []
+
+
 def _moves_with_promotion(
     position: Position,
     from_square: str,
@@ -298,21 +378,17 @@ def _moves_with_promotion(
         else:
             moves.append(Move(from_square=from_square, to_square=to_square, promote=False))
 
-    return moves
+    return _dedupe_moves(moves)
 
 
 def _step_destinations(
     position: Position,
     row: int,
     col: int,
+    piece: str,
     directions: list[tuple[int, int]],
 ) -> list[str]:
     result: list[str] = []
-    from_square = index_to_square(row, col)
-    piece = position.get_piece_at(from_square)
-    if piece is None:
-        return result
-
     side = get_piece_side(piece)
 
     for dr, dc in directions:
@@ -335,14 +411,10 @@ def _slide_destinations(
     position: Position,
     row: int,
     col: int,
+    piece: str,
     directions: list[tuple[int, int]],
 ) -> list[str]:
     result: list[str] = []
-    from_square = index_to_square(row, col)
-    piece = position.get_piece_at(from_square)
-    if piece is None:
-        return result
-
     side = get_piece_side(piece)
 
     for dr, dc in directions:
@@ -364,6 +436,34 @@ def _slide_destinations(
             nc += dc
 
     return result
+
+
+def _is_legal_after_move(position: Position, move: Move, moving_side: str) -> bool:
+    if move.is_drop:
+        return False
+    if move.from_square is None:
+        return False
+
+    from_square = move.from_square
+    to_square = move.to_square
+
+    moving_piece = position.get_piece_at(from_square)
+    captured_piece = position.get_piece_at(to_square)
+
+    if moving_piece is None:
+        return False
+
+    moved_piece = promote_piece(moving_piece) if move.promote else moving_piece
+
+    position.set_piece_at(from_square, None)
+    position.set_piece_at(to_square, moved_piece)
+
+    safe = not is_in_check(position, moving_side)
+
+    position.set_piece_at(from_square, moving_piece)
+    position.set_piece_at(to_square, captured_piece)
+
+    return safe
 
 
 def _forward_relative_dirs(side: str, dirs: list[tuple[int, int]]) -> list[tuple[int, int]]:

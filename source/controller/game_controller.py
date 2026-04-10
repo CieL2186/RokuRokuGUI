@@ -133,7 +133,16 @@ class GameController:
             self._move_list_widget.set_moves(history_items)
 
         self._refresh_view()
-        self._set_status("1手戻しました。")
+
+        current_side = self._position.get_side_to_move()
+        turn_text = "先手" if current_side == "black" else "後手"
+
+        if self._position.is_checkmate(current_side):
+            self._set_status(f"{turn_text}は詰みです。")
+        elif self._position.is_in_check(current_side):
+            self._set_status(f"{turn_text}は王手されています。")
+        else:
+            self._set_status("1手戻しました。")
 
     def _resolve_move_choice(
         self,
@@ -174,19 +183,21 @@ class GameController:
         self._clear_board_selection()
         self._refresh_view()
 
-        if move.promote:
-            self._set_status(f"{move.to_usi()} で成りました。")
-        else:
-            self._set_status(f"{move.to_usi()} を指しました。")
+        next_side = self._position.get_side_to_move()
+        next_side_text = "先手" if next_side == "black" else "後手"
 
-        if self._position.is_game_over():
-            result = self._position.get_game_result()
-            if result == "black":
-                self._set_status("対局終了: 先手の勝ちです。")
-            elif result == "white":
-                self._set_status("対局終了: 後手の勝ちです。")
-            else:
-                self._set_status("対局終了です。")
+        move_text = f"{move.to_usi()} で成りました。" if move.promote else f"{move.to_usi()} を指しました。"
+
+        if self._position.is_checkmate(next_side):
+            winner = "先手" if moving_side == "black" else "後手"
+            self._set_status(f"{move_text} {next_side_text}は詰みです。{winner}の勝ちです。")
+            return
+
+        if self._position.is_in_check(next_side):
+            self._set_status(f"{move_text} {next_side_text}に王手です。")
+            return
+
+        self._set_status(move_text)
 
     def _select_square(self, square: str) -> None:
         self._selected_square = square

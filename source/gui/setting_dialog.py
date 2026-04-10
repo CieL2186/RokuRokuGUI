@@ -8,7 +8,6 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QGridLayout,
     QGroupBox,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
@@ -27,14 +26,7 @@ class SettingDialog(QDialog):
         self.resize(520, 320)
 
         self.game_mode_combo = QComboBox()
-        self.game_mode_combo.addItems(
-            [
-                "人 vs 人",
-                "人 vs AI",
-                "AI vs 人",
-                "AI vs AI",
-            ]
-        )
+        self.game_mode_combo.addItems(["人 vs 人", "人 vs AI", "AI vs 人", "AI vs AI"])
 
         self.black_player_combo = QComboBox()
         self.black_player_combo.addItems(["人間", "AI"])
@@ -60,20 +52,17 @@ class SettingDialog(QDialog):
         root_layout = QVBoxLayout()
         self.setLayout(root_layout)
 
-        # 対局モード
         mode_group = QGroupBox("対局モード")
         mode_layout = QFormLayout()
         mode_group.setLayout(mode_layout)
         mode_layout.addRow("モード", self.game_mode_combo)
 
-        # プレイヤー設定
         player_group = QGroupBox("プレイヤー設定")
         player_layout = QFormLayout()
         player_group.setLayout(player_layout)
         player_layout.addRow("先手", self.black_player_combo)
         player_layout.addRow("後手", self.white_player_combo)
 
-        # エンジン設定
         engine_group = QGroupBox("エンジン設定")
         engine_layout = QGridLayout()
         engine_group.setLayout(engine_layout)
@@ -96,10 +85,8 @@ class SettingDialog(QDialog):
         self.game_mode_combo.currentIndexChanged.connect(self._sync_ui_from_mode)
         self.black_player_combo.currentIndexChanged.connect(self._sync_engine_inputs)
         self.white_player_combo.currentIndexChanged.connect(self._sync_engine_inputs)
-
         self.black_engine_browse_button.clicked.connect(self._browse_black_engine)
         self.white_engine_browse_button.clicked.connect(self._browse_white_engine)
-
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
 
@@ -127,7 +114,6 @@ class SettingDialog(QDialog):
 
         self.black_engine_edit.setEnabled(black_is_ai)
         self.black_engine_browse_button.setEnabled(black_is_ai)
-
         self.white_engine_edit.setEnabled(white_is_ai)
         self.white_engine_browse_button.setEnabled(white_is_ai)
 
@@ -152,7 +138,6 @@ class SettingDialog(QDialog):
             self.white_engine_edit.setText(path)
 
     def get_settings(self) -> dict[str, str]:
-        """現在の設定内容を辞書で返す。"""
         return {
             "game_mode": self.game_mode_combo.currentText(),
             "black_player": self.black_player_combo.currentText(),
@@ -160,15 +145,3 @@ class SettingDialog(QDialog):
             "black_engine_path": self.black_engine_edit.text().strip(),
             "white_engine_path": self.white_engine_edit.text().strip(),
         }
-
-
-if __name__ == "__main__":
-    from PySide6.QtWidgets import QApplication
-
-    app = QApplication([])
-
-    dialog = SettingDialog()
-    if dialog.exec():
-        print(dialog.get_settings())
-
-    app.exec()

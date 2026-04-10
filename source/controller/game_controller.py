@@ -1,20 +1,12 @@
 from __future__ import annotations
 
-from typing import Callable, Optional
+from typing import Callable
 
 from PySide6.QtCore import QObject, Signal
 
-from core.move import Move
-
-try:
-    from core.position import Position
-except Exception:  # pragma: no cover
-    Position = object  # type: ignore[misc,assignment]
-
-try:
-    from core import rules
-except Exception:  # pragma: no cover
-    rules = None
+from source.core.move import Move
+from source.core.position import Position
+from source.core import rules
 
 
 class GameController(QObject):
@@ -28,9 +20,9 @@ class GameController(QObject):
         board_widget,
         move_list_widget=None,
         *,
-        status_callback: Optional[Callable[[str], None]] = None,
-        turn_callback: Optional[Callable[[str], None]] = None,
-        phase_callback: Optional[Callable[[str], None]] = None,
+        status_callback: Callable[[str], None] | None = None,
+        turn_callback: Callable[[str], None] | None = None,
+        phase_callback: Callable[[str], None] | None = None,
     ) -> None:
         super().__init__()
         self.board_widget = board_widget
@@ -39,30 +31,15 @@ class GameController(QObject):
         self.turn_callback = turn_callback
         self.phase_callback = phase_callback
 
-        self.position = None
-        self.selected_square: Optional[str] = None
+        self.position: Position | None = None
+        self.selected_square: str | None = None
         self.legal_moves_from_selected: list[Move] = []
-        self.last_clicked_square: Optional[str] = None
+        self.last_clicked_square: str | None = None
 
-        if hasattr(self.board_widget, "square_clicked"):
-            self.board_widget.square_clicked.connect(self.on_square_clicked)
+        self.board_widget.square_clicked.connect(self.on_square_clicked)
 
-    def new_game(self, position: Optional[Position] = None) -> None:
-        if position is not None:
-            self.position = position
-        else:
-            position_cls = self._resolve_position_class()
-            if position_cls is None:
-                raise RuntimeError(
-                    "Position を生成できません。core.position.Position を実装するか、"
-                    "new_game(position=...) で局面オブジェクトを渡してください。"
-                )
-            self.position = position_cls()
-            if hasattr(self.position, "new_game"):
-                self.position.new_game()
-            elif hasattr(self.position, "reset"):
-                self.position.reset()
-
+    def new_game(self, position: Position | None = None) -> None:
+        self.position = position if position is not None else Position()
         self.selected_square = None
         self.legal_moves_from_selected = []
         self.last_clicked_square = None
@@ -113,12 +90,7 @@ class GameController(QObject):
         if self.position is None:
             return False
 
-        if hasattr(self.position, "undo_move"):
-            ok = bool(self.position.undo_move())
-        else:
-            ok = False
-
-        if not ok:
+        if not self.position.undo_move():
             self._emit_status("これ以上戻せません")
             return False
 
@@ -160,30 +132,26 @@ class GameController(QObject):
         if self.position is None:
             return
 
-        ok = self._do_move(move)
-        if not ok:
+        if not self.position.do_move(move):
             self._emit_status(f"指し手を適用できませんでした: {move}")
             return
 
-        move_text = self._move_to_text(move)
-        if self.move_list_widget is not None:
-            if hasattr(self.move_list_widget, "add_move"):
-                self.move_list_widget.add_move(move_text)
-            elif hasattr(self.move_list_widget, "append_move"):
-                self.move_list_widget.append_move(move_text)
+        move_text = move.to_usi()
+        if self.move_list_widget is not None and hasattr(self.move_list_widget, "add_move"):
+            self.move_list_widget.add_move(move_text)
 
         self._clear_selection(refresh=False)
         self.refresh_view()
         self.move_made.emit(move_text)
 
-        if self._is_game_over():
+        if self.position.is_game_over():
             self._emit_status(self._get_game_result_text())
         else:
             self._emit_status(f"着手: {move_text}")
 
-    def _find_move_to(self, destination: str) -> Optional[Move]:
+    def _find_move_to(self, destination: str) -> Move | None:
         for move in self.legal_moves_from_selected:
-            if getattr(move, "to_square", None) == destination:
+            if move.to_square == destination:
                 return move
         return None
 
@@ -193,156 +161,48 @@ class GameController(QObject):
     def _get_legal_moves_from(self, square: str) -> list[Move]:
         if self.position is None:
             return []
-
-        if hasattr(self.position, "get_legal_moves_from"):
-            moves = self.position.get_legal_moves_from(square)
-            return list(moves)
-
-        if rules is not None:
-            if hasattr(rules, "get_legal_moves_from"):
-                return list(rules.get_legal_moves_from(self.position, square))
-            if hasattr(rules, "generate_legal_moves_from"):
-                return list(rules.generate_legal_moves_from(self.position, square))
-            if hasattr(rules, "get_all_legal_moves"):
-                all_moves = list(rules.get_all_legal_moves(self.position))
-                return [m for m in all_moves if getattr(m, "from_square", None) == square]
-
-        return []
-
-    def _do_move(self, move: Move) -> bool:
-        if self.position is None:
-            return False
-
-        if hasattr(self.position, "do_move"):
-            return bool(self.position.do_move(move))
-
-        if rules is not None and hasattr(rules, "do_move"):
-            return bool(rules.do_move(self.position, move))
-
-        return False
-
-    def _is_game_over(self) -> bool:
-        if self.position is None:
-            return False
-        if hasattr(self.position, "is_game_over"):
-            return bool(self.position.is_game_over())
-        if rules is not None and hasattr(rules, "is_game_over"):
-            return bool(rules.is_game_over(self.position))
-        return False
+        return list(self.position.get_legal_moves_from(square))
 
     def _get_game_result_text(self) -> str:
         if self.position is None:
             return "対局終了"
-
-        if hasattr(self.position, "get_game_result"):
-            result = self.position.get_game_result()
-            return f"対局終了: {result}"
-
-        if rules is not None and hasattr(rules, "get_game_result"):
-            result = rules.get_game_result(self.position)
-            return f"対局終了: {result}"
-
-        return "対局終了"
+        return f"対局終了: {self.position.get_game_result()}"
 
     def _get_move_history_usi(self) -> list[str]:
         if self.position is None:
             return []
-
-        if hasattr(self.position, "get_move_history"):
-            history = self.position.get_move_history()
-        elif hasattr(self.position, "move_history"):
-            history = self.position.move_history
-        else:
-            history = []
-
-        result: list[str] = []
-        for move in history:
-            if hasattr(move, "to_usi"):
-                result.append(move.to_usi())
-            else:
-                result.append(str(move))
-        return result
+        return [move.to_usi() for move in self.position.get_move_history()]
 
     def _update_board_widget(self) -> None:
         if self.position is None:
             return
-
-        board = None
-        if hasattr(self.position, "get_board"):
-            board = self.position.get_board()
-        elif hasattr(self.position, "board"):
-            board = self.position.board
-
-        if hasattr(self.board_widget, "set_board"):
-            self.board_widget.set_board(board)
-        elif hasattr(self.board_widget, "load_position"):
-            self.board_widget.load_position(board)
-        elif hasattr(self.board_widget, "board"):
-            self.board_widget.board = board
-            if hasattr(self.board_widget, "update"):
-                self.board_widget.update()
+        self.board_widget.set_board(self.position.get_board())
 
     def _update_highlight(self) -> None:
-        legal_targets = [getattr(move, "to_square", None) for move in self.legal_moves_from_selected]
-        legal_targets = [sq for sq in legal_targets if sq is not None]
-
-        if hasattr(self.board_widget, "set_selected_square"):
-            self.board_widget.set_selected_square(self.selected_square)
-        elif hasattr(self.board_widget, "selected_square"):
-            self.board_widget.selected_square = self.selected_square
+        legal_targets = [move.to_square for move in self.legal_moves_from_selected if move.to_square is not None]
+        self.board_widget.set_selected_square(self.selected_square)
 
         if hasattr(self.board_widget, "set_legal_target_squares"):
             self.board_widget.set_legal_target_squares(legal_targets)
-        elif hasattr(self.board_widget, "set_legal_moves"):
-            self.board_widget.set_legal_moves(legal_targets)
-        elif hasattr(self.board_widget, "legal_target_squares"):
-            self.board_widget.legal_target_squares = legal_targets
-
-        if hasattr(self.board_widget, "update"):
+        elif hasattr(self.board_widget, "set_highlight_squares"):
+            self.board_widget.set_highlight_squares(legal_targets)
+        else:
             self.board_widget.update()
 
     def _update_side_to_move(self) -> None:
         if self.turn_callback is None or self.position is None:
             return
 
-        side = None
-        if hasattr(self.position, "get_side_to_move"):
-            side = self.position.get_side_to_move()
-        elif hasattr(self.position, "side_to_move"):
-            side = self.position.side_to_move
-
-        if side is None:
-            return
-
-        if isinstance(side, int):
-            text = "先手" if side == 0 else "後手"
-        else:
-            text = str(side)
+        side = self.position.get_side_to_move()
+        text = "先手" if side == rules.BLACK else "後手"
         self.turn_callback(text)
 
     def _update_phase(self) -> None:
         if self.phase_callback is None or self.position is None:
             return
-
-        phase = None
-        if hasattr(self.position, "get_phase"):
-            phase = self.position.get_phase()
-        elif hasattr(self.position, "phase"):
-            phase = self.position.phase
-
-        if phase is not None:
-            self.phase_callback(str(phase))
+        self.phase_callback(str(self.position.get_phase()))
 
     def _emit_status(self, text: str) -> None:
         self.status_changed.emit(text)
         if self.status_callback is not None:
             self.status_callback(text)
-
-    def _move_to_text(self, move: Move) -> str:
-        if hasattr(move, "to_usi"):
-            return move.to_usi()
-        return str(move)
-
-    @staticmethod
-    def _resolve_position_class():
-        return Position if Position is not object else None

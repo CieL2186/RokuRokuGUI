@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
-from core.move import Move
+from source.core.move import Move
 
 FILES = "654321"
 RANKS = "abcdef"
@@ -66,6 +66,8 @@ def get_legal_moves_from(position, square: str) -> list[Move]:
 def get_all_legal_moves(position) -> list[Move]:
     moves: list[Move] = []
     for square, piece in position.board.items():
+        if piece is None:
+            continue
         if piece_side(piece) != position.side_to_move:
             continue
         moves.extend(get_legal_moves_from(position, square))
@@ -81,13 +83,14 @@ def is_legal_move(position, move: Move) -> bool:
 def do_move(position, move: Move) -> bool:
     if move.from_square is None or move.to_square is None:
         return False
+
     piece = position.board.get(move.from_square)
     if piece is None:
         return False
     if piece_side(piece) != position.side_to_move:
         return False
 
-    position.board.pop(move.from_square, None)
+    position.board[move.from_square] = None
     position.board[move.to_square] = piece
     position.move_history.append(move)
     position.side_to_move = WHITE if position.side_to_move == BLACK else BLACK
@@ -95,14 +98,14 @@ def do_move(position, move: Move) -> bool:
 
 
 def is_game_over(position) -> bool:
-    has_black_king = any(piece == "bK" for piece in position.board.values())
-    has_white_king = any(piece == "wK" for piece in position.board.values())
+    has_black_king = any(is_black_king(piece) for piece in position.board.values())
+    has_white_king = any(is_white_king(piece) for piece in position.board.values())
     return not has_black_king or not has_white_king
 
 
 def get_game_result(position) -> str:
-    has_black_king = any(piece == "bK" for piece in position.board.values())
-    has_white_king = any(piece == "wK" for piece in position.board.values())
+    has_black_king = any(is_black_king(piece) for piece in position.board.values())
+    has_white_king = any(is_white_king(piece) for piece in position.board.values())
 
     if has_black_king and has_white_king:
         return "未決着"
@@ -114,11 +117,15 @@ def get_game_result(position) -> str:
 
 
 def piece_side(piece: str) -> int:
-    return BLACK if piece.startswith("b") else WHITE
+    if piece.startswith("b") or piece.isupper():
+        return BLACK
+    return WHITE
 
 
 def piece_kind(piece: str) -> str:
-    return piece[1:]
+    if len(piece) >= 2 and piece[0] in {"b", "w"}:
+        return piece[1:]
+    return piece.upper()
 
 
 def oriented_vectors(vectors: Iterable[tuple[int, int]], side: int) -> list[tuple[int, int]]:
@@ -138,7 +145,7 @@ def ray_squares(start_square: str, dx: int, dy: int) -> list[str]:
         result.append(xy_to_square(x, y))
 
 
-def offset_square(square: str, dx: int, dy: int) -> Optional[str]:
+def offset_square(square: str, dx: int, dy: int) -> str | None:
     x, y = square_to_xy(square)
     x += dx
     y += dy
@@ -161,3 +168,11 @@ def xy_to_square(x: int, y: int) -> str:
 
 def inside_board(x: int, y: int) -> bool:
     return 0 <= x < BOARD_WIDTH and 0 <= y < BOARD_HEIGHT
+
+
+def is_black_king(piece: str | None) -> bool:
+    return piece in {"bK", "K"}
+
+
+def is_white_king(piece: str | None) -> bool:
+    return piece in {"wK", "k"}

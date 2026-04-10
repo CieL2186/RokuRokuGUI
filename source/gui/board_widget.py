@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from PySide6.QtCore import QRectF, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QPaintEvent, QPen
@@ -8,23 +8,7 @@ from PySide6.QtWidgets import QSizePolicy, QWidget
 
 
 class BoardWidget(QWidget):
-    """
-    66将棋の盤面表示用ウィジェット。
-
-    責務:
-    - 6x6盤を描画する
-    - 座標ラベルを描画する
-    - 駒を描画する
-    - 選択マスをハイライトする
-    - 合法手候補をハイライトする
-    - クリックされたマスを座標文字列で返す
-
-    非責務:
-    - 合法手判定
-    - 手番管理
-    - 指し手適用
-    - AI通信
-    """
+    """66将棋の盤面表示用ウィジェット。"""
 
     square_clicked = Signal(str)
 
@@ -42,7 +26,6 @@ class BoardWidget(QWidget):
         self._selected_square: str | None = None
         self._highlight_squares: set[str] = set()
 
-        # 盤面はウィンドウサイズに合わせて拡縮できる方が自然
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumSize(self.minimumSizeHint())
         self.setMouseTracking(True)
@@ -62,28 +45,26 @@ class BoardWidget(QWidget):
         )
 
     def set_board(self, board: dict[str, str | None]) -> None:
-        """盤面情報を更新する。キーは '5e' 形式。値は駒文字列または None。"""
         self._board = board.copy()
         self.update()
 
     def set_selected_square(self, square: str | None) -> None:
-        """選択中のマスを更新する。"""
         self._selected_square = square
         self.update()
 
     def set_highlight_squares(self, squares: Iterable[str]) -> None:
-        """合法手候補などのハイライト対象マスを更新する。"""
         self._highlight_squares = set(squares)
         self.update()
 
+    def set_legal_target_squares(self, squares: Iterable[str]) -> None:
+        self.set_highlight_squares(squares)
+
     def clear_selection(self) -> None:
-        """選択状態とハイライトをクリアする。"""
         self._selected_square = None
         self._highlight_squares.clear()
         self.update()
 
     def get_square_at_position(self, x: int, y: int) -> str | None:
-        """ウィジェット上の座標から盤上のマス ('5e' 形式) を返す。盤外なら None。"""
         board_rect = self._board_rect()
         if not board_rect.contains(x, y):
             return None
@@ -151,14 +132,12 @@ class BoardWidget(QWidget):
         painter.setFont(font)
         painter.setPen(QColor("#222222"))
 
-        # 上部の列ラベル: 6 5 4 3 2 1
         for col in range(self.BOARD_SIZE):
             file_num = str(self.BOARD_SIZE - col)
             x = board_rect.left() + col * square_size
             rect = QRectF(x, 0, square_size, self.LABEL_MARGIN_TOP)
             painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, file_num)
 
-        # 左側の行ラベル: a b c d e f
         for row in range(self.BOARD_SIZE):
             rank_char = chr(ord("a") + row)
             y = board_rect.top() + row * square_size
@@ -221,8 +200,8 @@ class BoardWidget(QWidget):
                 square_size,
             )
 
-            painter.setPen(QColor("#111111"))
-            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, piece)
+            painter.setPen(self._piece_color(piece))
+            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, self._piece_display_text(piece))
 
     def _board_rect(self) -> QRectF:
         square_size = self._square_size()
@@ -235,14 +214,8 @@ class BoardWidget(QWidget):
         )
 
     def _square_size(self) -> float:
-        available_w = max(
-            1,
-            self.width() - self.LABEL_MARGIN_LEFT - self.LABEL_MARGIN_RIGHT,
-        )
-        available_h = max(
-            1,
-            self.height() - self.LABEL_MARGIN_TOP - self.LABEL_MARGIN_BOTTOM,
-        )
+        available_w = max(1, self.width() - self.LABEL_MARGIN_LEFT - self.LABEL_MARGIN_RIGHT)
+        available_h = max(1, self.height() - self.LABEL_MARGIN_TOP - self.LABEL_MARGIN_BOTTOM)
         return min(available_w, available_h) / self.BOARD_SIZE
 
     @classmethod
@@ -256,8 +229,8 @@ class BoardWidget(QWidget):
 
     @classmethod
     def _index_to_square(cls, row: int, col: int) -> str:
-        file_num = str(cls.BOARD_SIZE - col)   # 左から 6,5,4,3,2,1
-        rank_char = chr(ord("a") + row)        # 上から a,b,c,d,e,f
+        file_num = str(cls.BOARD_SIZE - col)
+        rank_char = chr(ord("a") + row)
         return f"{file_num}{rank_char}"
 
     @classmethod
@@ -279,53 +252,14 @@ class BoardWidget(QWidget):
         col = cls.BOARD_SIZE - file_num
         return row, col
 
+    @staticmethod
+    def _piece_display_text(piece: str) -> str:
+        if len(piece) >= 2 and piece[0] in {"b", "w"}:
+            return piece[1:]
+        return piece.upper()
 
-if __name__ == "__main__":
-    from PySide6.QtWidgets import QApplication
-
-    app = QApplication([])
-
-    widget = BoardWidget()
-    widget.resize(520, 520)
-
-    sample_board = {
-        "6a": "r",
-        "5a": "b",
-        "4a": "g",
-        "3a": "s",
-        "2a": "n",
-        "1a": "k",
-        "6b": "p",
-        "5b": "p",
-        "4b": "p",
-        "3b": "p",
-        "2b": "p",
-        "1b": "p",
-        "6e": "P",
-        "5e": "P",
-        "4e": "P",
-        "3e": "P",
-        "2e": "P",
-        "1e": "P",
-        "6f": "R",
-        "5f": "B",
-        "4f": "G",
-        "3f": "S",
-        "2f": "N",
-        "1f": "K",
-    }
-
-    full_board = BoardWidget.create_empty_board()
-    full_board.update(sample_board)
-
-    widget.set_board(full_board)
-    widget.set_selected_square("5e")
-    widget.set_highlight_squares(["5d", "4d", "6d"])
-
-    def on_square_clicked(square: str) -> None:
-        print(f"clicked: {square}")
-
-    widget.square_clicked.connect(on_square_clicked)
-    widget.show()
-
-    app.exec()
+    @staticmethod
+    def _piece_color(piece: str) -> QColor:
+        if piece.startswith("w") or piece.islower():
+            return QColor("#7a1f1f")
+        return QColor("#111111")

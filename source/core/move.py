@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass(frozen=True, slots=True)
 class Move:
-    from_square: Optional[str] = None
-    to_square: Optional[str] = None
-    drop_piece: Optional[str] = None
+    from_square: str | None = None
+    to_square: str | None = None
+    drop_piece: str | None = None
     promote: bool = False
 
     @property

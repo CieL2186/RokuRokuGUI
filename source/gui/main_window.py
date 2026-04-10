@@ -3,14 +3,17 @@ from __future__ import annotations
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
-    QListWidget,
     QMainWindow,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
-from gui.board_widget import BoardWidget
+from source.controller.game_controller import GameController
+from source.core.position import Position
+from source.gui.board_widget import BoardWidget
+from source.gui.move_list_widget import MoveListWidget
+from source.gui.setting_dialog import SettingDialog
 
 
 class MainWindow(QMainWindow):
@@ -22,17 +25,26 @@ class MainWindow(QMainWindow):
         self.resize(900, 600)
 
         self.board_widget = BoardWidget()
-        self.status_label = QLabel("クリックしたマス: なし")
+        self.clicked_square_label = QLabel("クリックしたマス: なし")
+        self.status_label = QLabel("状態: 待機中")
         self.turn_label = QLabel("手番: 未設定")
         self.phase_label = QLabel("フェーズ: 未設定")
-        self.move_list_widget = QListWidget()
+        self.move_list_widget = MoveListWidget()
 
         self.new_game_button = QPushButton("新規対局")
         self.settings_button = QPushButton("設定")
 
+        self.controller = GameController(
+            self.board_widget,
+            self.move_list_widget,
+            status_callback=self._set_status,
+            turn_callback=self._set_turn,
+            phase_callback=self._set_phase,
+        )
+
         self._setup_ui()
         self._connect_signals()
-        self._load_sample_board()
+        self.controller.new_game(Position())
 
     def _setup_ui(self) -> None:
         central_widget = QWidget()
@@ -41,12 +53,11 @@ class MainWindow(QMainWindow):
         root_layout = QHBoxLayout()
         central_widget.setLayout(root_layout)
 
-        # 左側: 盤面
         left_layout = QVBoxLayout()
         left_layout.addWidget(self.board_widget)
 
-        # 右側: 情報表示
         right_layout = QVBoxLayout()
+        right_layout.addWidget(self.clicked_square_label)
         right_layout.addWidget(self.status_label)
         right_layout.addWidget(self.turn_label)
         right_layout.addWidget(self.phase_label)
@@ -65,51 +76,25 @@ class MainWindow(QMainWindow):
         self.settings_button.clicked.connect(self._on_settings_clicked)
 
     def _on_square_clicked(self, square: str) -> None:
-        self.status_label.setText(f"クリックしたマス: {square}")
-        self.board_widget.set_selected_square(square)
+        self.clicked_square_label.setText(f"クリックしたマス: {square}")
 
     def _on_new_game_clicked(self) -> None:
-        self.status_label.setText("クリックしたマス: なし")
-        self.turn_label.setText("手番: 先手")
-        self.phase_label.setText("フェーズ: 配置")
-        self.move_list_widget.clear()
-        self._load_sample_board()
-        self.board_widget.clear_selection()
+        self.controller.new_game(Position())
+        self.clicked_square_label.setText("クリックしたマス: なし")
 
     def _on_settings_clicked(self) -> None:
-        self.status_label.setText("設定画面は未実装です")
+        dialog = SettingDialog(self)
+        if dialog.exec():
+            settings = dialog.get_settings()
+            self._set_status(f"設定を更新しました: {settings['game_mode']}")
+        else:
+            self._set_status("設定をキャンセルしました")
 
-    def _load_sample_board(self) -> None:
-        board = BoardWidget._create_empty_board()
-        board.update(
-            {
-                "6a": "r",
-                "5a": "b",
-                "4a": "g",
-                "3a": "s",
-                "2a": "n",
-                "1a": "k",
-                "6b": "p",
-                "5b": "p",
-                "4b": "p",
-                "3b": "p",
-                "2b": "p",
-                "1b": "p",
-                "6e": "P",
-                "5e": "P",
-                "4e": "P",
-                "3e": "P",
-                "2e": "P",
-                "1e": "P",
-                "6f": "R",
-                "5f": "B",
-                "4f": "G",
-                "3f": "S",
-                "2f": "N",
-                "1f": "K",
-            }
-        )
+    def _set_status(self, text: str) -> None:
+        self.status_label.setText(f"状態: {text}")
 
-        self.board_widget.set_board(board)
-        self.turn_label.setText("手番: 先手")
-        self.phase_label.setText("フェーズ: 配置")
+    def _set_turn(self, text: str) -> None:
+        self.turn_label.setText(f"手番: {text}")
+
+    def _set_phase(self, text: str) -> None:
+        self.phase_label.setText(f"フェーズ: {text}")

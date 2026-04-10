@@ -165,10 +165,7 @@ class MainWindow(QMainWindow):
         widget_height = self.promotion_widget.height()
 
         x = rect.center().x() - widget_width // 2
-        y = rect.top() - widget_height - 6
-
-        if y < 0:
-            y = rect.bottom() + 6
+        y = rect.bottom() - widget_height - 4
 
         max_x = max(0, self.board_widget.width() - widget_width)
         max_y = max(0, self.board_widget.height() - widget_height)

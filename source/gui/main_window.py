@@ -87,9 +87,12 @@ class MainWindow(QMainWindow):
         self.promote_button = QPushButton("成", self.promotion_widget)
         self.no_promote_button = QPushButton("不成", self.promotion_widget)
 
+        self.promote_button.setFixedSize(30, 24)
+        self.no_promote_button.setFixedSize(42, 24)
+
         layout = QHBoxLayout()
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(4)
+        layout.setContentsMargins(2, 2, 2, 2)
+        layout.setSpacing(2)
         layout.addWidget(self.promote_button)
         layout.addWidget(self.no_promote_button)
         self.promotion_widget.setLayout(layout)
@@ -97,13 +100,14 @@ class MainWindow(QMainWindow):
         self.promotion_widget.setStyleSheet(
             """
             QFrame#promotionWidget {
-                background-color: rgba(255, 255, 255, 235);
+                background-color: rgba(255, 255, 255, 210);
                 border: 1px solid #666666;
                 border-radius: 4px;
             }
             QFrame#promotionWidget QPushButton {
-                padding: 4px 10px;
-                min-width: 44px;
+                padding: 0px;
+                margin: 0px;
+                font-size: 11px;
             }
             """
         )
@@ -161,10 +165,7 @@ class MainWindow(QMainWindow):
         widget_height = self.promotion_widget.height()
 
         x = rect.center().x() - widget_width // 2
-        y = rect.top() - widget_height - 6
-
-        if y < 0:
-            y = rect.bottom() + 6
+        y = rect.bottom() - widget_height - 4
 
         max_x = max(0, self.board_widget.width() - widget_width)
         max_y = max(0, self.board_widget.height() - widget_height)

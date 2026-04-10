@@ -3,12 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class Move:
-    from_square: str | None = None
-    to_square: str | None = None
-    drop_piece: str | None = None
+    """66将棋GUIで扱う指し手表現。"""
+
+    from_square: str | None
+    to_square: str
     promote: bool = False
+    drop_piece: str | None = None
 
     @property
     def is_drop(self) -> bool:
@@ -16,14 +18,13 @@ class Move:
 
     def to_usi(self) -> str:
         if self.is_drop:
-            if self.drop_piece is None or self.to_square is None:
-                raise ValueError("Drop move requires drop_piece and to_square.")
             return f"{self.drop_piece}*{self.to_square}"
 
-        if self.from_square is None or self.to_square is None:
-            raise ValueError("Normal move requires from_square and to_square.")
+        if self.from_square is None:
+            raise ValueError("通常手なのに from_square がありません。")
 
-        return f"{self.from_square}{self.to_square}{'+' if self.promote else ''}"
+        suffix = "+" if self.promote else ""
+        return f"{self.from_square}{self.to_square}{suffix}"
 
     def __str__(self) -> str:
         return self.to_usi()

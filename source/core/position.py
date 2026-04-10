@@ -1,110 +1,35 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass
 
-from source.core.move import Move
 from source.core import rules
-
-
-@dataclass(slots=True)
-class _Snapshot:
-    board: dict[str, str | None]
-    side_to_move: int
-    phase: str
-    move_history: list[Move]
+from source.core.move import Move
 
 
 class Position:
-    """66将棋GUI の controller 動作確認用の最小 Position。"""
+    """局面データと基本操作を管理する。"""
 
     def __init__(self) -> None:
-        self.board: dict[str, str | None] = {}
-        self.side_to_move: int = rules.BLACK
+        self.board: dict[str, str | None] = self.create_empty_board()
+        self.side_to_move: str = "black"
         self.phase: str = "対局"
         self.move_history: list[Move] = []
-        self._snapshots: list[_Snapshot] = []
+        self._undo_stack: list[tuple[dict[str, str | None], str, str, list[Move]]] = []
+
         self.new_game()
 
-    def new_game(self) -> None:
-        self.reset()
-
-    def reset(self) -> None:
-        self.board = self._create_demo_battle_board()
-        self.side_to_move = rules.BLACK
-        self.phase = "対局"
-        self.move_history = []
-        self._snapshots = []
-
-    def get_board(self) -> dict[str, str | None]:
-        return dict(self.board)
-
-    def get_side_to_move(self) -> int:
-        return self.side_to_move
-
-    def get_phase(self) -> str:
-        return self.phase
-
-    def get_piece_at(self, square: str) -> str | None:
-        return self.board.get(square)
-
-    def get_legal_moves_from(self, square: str) -> list[Move]:
-        return list(rules.get_legal_moves_from(self, square))
-
-    def get_all_legal_moves(self) -> list[Move]:
-        return list(rules.get_all_legal_moves(self))
-
-    def do_move(self, move: Move) -> bool:
-        if not rules.is_legal_move(self, move):
-            return False
-
-        self._snapshots.append(
-            _Snapshot(
-                board=deepcopy(self.board),
-                side_to_move=self.side_to_move,
-                phase=self.phase,
-                move_history=list(self.move_history),
-            )
-        )
-        return rules.do_move(self, move)
-
-    def undo_move(self) -> bool:
-        if not self._snapshots:
-            return False
-
-        snap = self._snapshots.pop()
-        self.board = snap.board
-        self.side_to_move = snap.side_to_move
-        self.phase = snap.phase
-        self.move_history = snap.move_history
-        return True
-
-    def get_move_history(self) -> list[Move]:
-        return list(self.move_history)
-
-    def is_game_over(self) -> bool:
-        return rules.is_game_over(self)
-
-    def get_game_result(self) -> str:
-        return rules.get_game_result(self)
-
-    def set_board(
-        self,
-        board: dict[str, str | None],
-        *,
-        side_to_move: int = rules.BLACK,
-        phase: str = "対局",
-    ) -> None:
-        self.board = dict(board)
-        self.side_to_move = side_to_move
-        self.phase = phase
-        self.move_history = []
-        self._snapshots = []
-
     @staticmethod
-    def _create_demo_battle_board() -> dict[str, str | None]:
-        board = {f"{file_}{rank}": None for file_ in "654321" for rank in "abcdef"}
-        board.update(
+    def create_empty_board() -> dict[str, str | None]:
+        board: dict[str, str | None] = {}
+        for file_num in "654321":
+            for rank_char in "abcdef":
+                board[f"{file_num}{rank_char}"] = None
+        return board
+
+    def new_game(self) -> None:
+        self.board = self.create_empty_board()
+
+        self.board.update(
             {
                 "6a": "r",
                 "5a": "b",
@@ -132,4 +57,101 @@ class Position:
                 "1f": "K",
             }
         )
-        return board
+
+        self.side_to_move = "black"
+        self.phase = "対局"
+        self.move_history.clear()
+        self._undo_stack.clear()
+
+    def get_piece_at(self, square: str) -> str | None:
+        return self.board.get(square)
+
+    def set_piece_at(self, square: str, piece: str | None) -> None:
+        self.board[square] = piece
+
+    def get_board(self) -> dict[str, str | None]:
+        return self.board.copy()
+
+    def get_side_to_move(self) -> str:
+        return self.side_to_move
+
+    def get_phase(self) -> str:
+        return self.phase
+
+    def get_move_history(self) -> list[Move]:
+        return self.move_history.copy()
+
+    def get_legal_moves_from(self, square: str) -> list[Move]:
+        return rules.generate_legal_moves_from(self, square)
+
+    def get_all_legal_moves(self) -> list[Move]:
+        return rules.get_all_legal_moves(self)
+
+    def is_legal_move(self, move: Move) -> bool:
+        if move.is_drop:
+            return False
+        if move.from_square is None:
+            return False
+
+        legal_moves = self.get_legal_moves_from(move.from_square)
+        return move in legal_moves
+
+    def do_move(self, move: Move) -> bool:
+        if not self.is_legal_move(move):
+            return False
+
+        if move.from_square is None:
+            return False
+
+        self._push_undo_state()
+
+        piece = self.get_piece_at(move.from_square)
+        if piece is None:
+            return False
+
+        self.set_piece_at(move.from_square, None)
+
+        moved_piece = rules.promote_piece(piece) if move.promote else piece
+        self.set_piece_at(move.to_square, moved_piece)
+
+        self.move_history.append(move)
+        self.side_to_move = "white" if self.side_to_move == "black" else "black"
+        return True
+
+    def undo_move(self) -> bool:
+        if not self._undo_stack:
+            return False
+
+        board, side_to_move, phase, move_history = self._undo_stack.pop()
+        self.board = board
+        self.side_to_move = side_to_move
+        self.phase = phase
+        self.move_history = move_history
+        return True
+
+    def is_game_over(self) -> bool:
+        black_king_exists = any(piece == "K" or piece == "bK" for piece in self.board.values())
+        white_king_exists = any(piece == "k" or piece == "wK" for piece in self.board.values())
+        return not black_king_exists or not white_king_exists
+
+    def get_game_result(self) -> str | None:
+        black_king_exists = any(piece == "K" or piece == "bK" for piece in self.board.values())
+        white_king_exists = any(piece == "k" or piece == "wK" for piece in self.board.values())
+
+        if black_king_exists and white_king_exists:
+            return None
+        if black_king_exists:
+            return "black"
+        if white_king_exists:
+            return "white"
+        return "draw"
+
+    def _push_undo_state(self) -> None:
+        self._undo_stack.append(
+            (
+                deepcopy(self.board),
+                self.side_to_move,
+                self.phase,
+                self.move_history.copy(),
+            )
+        )

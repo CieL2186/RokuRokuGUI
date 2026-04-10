@@ -3,14 +3,16 @@ from __future__ import annotations
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
-    QListWidget,
     QMainWindow,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
-from gui.board_widget import BoardWidget
+from source.controller.game_controller import GameController
+from source.gui.board_widget import BoardWidget
+from source.gui.move_list_widget import MoveListWidget
+from source.gui.setting_dialog import SettingDialog
 
 
 class MainWindow(QMainWindow):
@@ -22,17 +24,35 @@ class MainWindow(QMainWindow):
         self.resize(900, 600)
 
         self.board_widget = BoardWidget()
-        self.status_label = QLabel("クリックしたマス: なし")
+        self.status_label = QLabel("対局を開始してください")
         self.turn_label = QLabel("手番: 未設定")
         self.phase_label = QLabel("フェーズ: 未設定")
-        self.move_list_widget = QListWidget()
+        self.move_list_widget = MoveListWidget()
 
         self.new_game_button = QPushButton("新規対局")
         self.settings_button = QPushButton("設定")
+        self.undo_button = QPushButton("1手戻す")
+
+        self.promotion_widget = QWidget()
+        self.promote_button = QPushButton("成")
+        self.no_promote_button = QPushButton("不成")
+
+        self.setting_dialog = SettingDialog(self)
 
         self._setup_ui()
+        self._hide_promotion_buttons()
+
+        self.controller = GameController(
+            board_widget=self.board_widget,
+            move_list_widget=self.move_list_widget,
+            status_callback=self.status_label.setText,
+            turn_callback=self.turn_label.setText,
+            phase_callback=self.phase_label.setText,
+            promotion_request_callback=self._show_promotion_buttons,
+            promotion_clear_callback=self._hide_promotion_buttons,
+        )
+
         self._connect_signals()
-        self._load_sample_board()
 
     def _setup_ui(self) -> None:
         central_widget = QWidget()
@@ -41,17 +61,24 @@ class MainWindow(QMainWindow):
         root_layout = QHBoxLayout()
         central_widget.setLayout(root_layout)
 
-        # 左側: 盤面
         left_layout = QVBoxLayout()
         left_layout.addWidget(self.board_widget)
 
-        # 右側: 情報表示
+        promotion_layout = QHBoxLayout()
+        promotion_layout.setContentsMargins(0, 0, 0, 0)
+        promotion_layout.addWidget(self.promote_button)
+        promotion_layout.addWidget(self.no_promote_button)
+        self.promotion_widget.setLayout(promotion_layout)
+
+        left_layout.addWidget(self.promotion_widget)
+
         right_layout = QVBoxLayout()
         right_layout.addWidget(self.status_label)
         right_layout.addWidget(self.turn_label)
         right_layout.addWidget(self.phase_label)
         right_layout.addWidget(self.new_game_button)
         right_layout.addWidget(self.settings_button)
+        right_layout.addWidget(self.undo_button)
         right_layout.addWidget(QLabel("棋譜"))
         right_layout.addWidget(self.move_list_widget)
         right_layout.addStretch()
@@ -60,56 +87,37 @@ class MainWindow(QMainWindow):
         root_layout.addLayout(right_layout, stretch=1)
 
     def _connect_signals(self) -> None:
-        self.board_widget.square_clicked.connect(self._on_square_clicked)
         self.new_game_button.clicked.connect(self._on_new_game_clicked)
         self.settings_button.clicked.connect(self._on_settings_clicked)
+        self.undo_button.clicked.connect(self._on_undo_clicked)
 
-    def _on_square_clicked(self, square: str) -> None:
-        self.status_label.setText(f"クリックしたマス: {square}")
-        self.board_widget.set_selected_square(square)
+        self.promote_button.clicked.connect(lambda: self.controller.handle_promotion_choice(True))
+        self.no_promote_button.clicked.connect(lambda: self.controller.handle_promotion_choice(False))
 
     def _on_new_game_clicked(self) -> None:
-        self.status_label.setText("クリックしたマス: なし")
-        self.turn_label.setText("手番: 先手")
-        self.phase_label.setText("フェーズ: 配置")
-        self.move_list_widget.clear()
-        self._load_sample_board()
-        self.board_widget.clear_selection()
+        self.controller.new_game()
 
     def _on_settings_clicked(self) -> None:
-        self.status_label.setText("設定画面は未実装です")
+        if self.setting_dialog.exec():
+            settings = self.setting_dialog.get_settings()
+            self.status_label.setText(
+                f"設定を更新しました: {settings['game_mode']}"
+            )
 
-    def _load_sample_board(self) -> None:
-        board = BoardWidget._create_empty_board()
-        board.update(
-            {
-                "6a": "r",
-                "5a": "b",
-                "4a": "g",
-                "3a": "s",
-                "2a": "n",
-                "1a": "k",
-                "6b": "p",
-                "5b": "p",
-                "4b": "p",
-                "3b": "p",
-                "2b": "p",
-                "1b": "p",
-                "6e": "P",
-                "5e": "P",
-                "4e": "P",
-                "3e": "P",
-                "2e": "P",
-                "1e": "P",
-                "6f": "R",
-                "5f": "B",
-                "4f": "G",
-                "3f": "S",
-                "2f": "N",
-                "1f": "K",
-            }
-        )
+    def _on_undo_clicked(self) -> None:
+        self.controller.undo_move()
 
-        self.board_widget.set_board(board)
-        self.turn_label.setText("手番: 先手")
-        self.phase_label.setText("フェーズ: 配置")
+    def _show_promotion_buttons(self, square: str) -> None:
+        self.promotion_widget.show()
+
+    def _hide_promotion_buttons(self) -> None:
+        self.promotion_widget.hide()
+
+
+if __name__ == "__main__":
+    from PySide6.QtWidgets import QApplication
+
+    app = QApplication([])
+    window = MainWindow()
+    window.show()
+    app.exec()

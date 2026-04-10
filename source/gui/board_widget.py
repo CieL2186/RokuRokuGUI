@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from PySide6.QtCore import QRectF, QSize, Qt, Signal
+from PySide6.QtCore import QRect, QRectF, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QMouseEvent, QPainter, QPaintEvent, QPen
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
@@ -232,6 +232,24 @@ class BoardWidget(QWidget):
         file_num = str(cls.BOARD_SIZE - col)
         rank_char = chr(ord("a") + row)
         return f"{file_num}{rank_char}"
+    
+    def get_square_rect(self, square: str) -> QRect | None:
+        """指定マスの描画領域を返す。盤外なら None。"""
+        pos = self._square_to_index(square)
+        if pos is None:
+            return None
+
+        row, col = pos
+        board_rect = self._board_rect()
+        square_size = self._square_size()
+
+        rect = QRectF(
+            board_rect.left() + col * square_size,
+            board_rect.top() + row * square_size,
+            square_size,
+            square_size,
+        )
+        return rect.toRect()
 
     @classmethod
     def _square_to_index(cls, square: str) -> tuple[int, int] | None:

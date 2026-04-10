@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from PySide6.QtGui import QResizeEvent
+from __future__ import annotations
+
+from PySide6.QtCore import QRect
+from PySide6.QtGui import QFont, QResizeEvent
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -85,10 +88,7 @@ class MainWindow(QMainWindow):
         self.promotion_widget.setObjectName("promotionWidget")
 
         self.promote_button = QPushButton("成", self.promotion_widget)
-        self.no_promote_button = QPushButton("不成", self.promotion_widget)
-
-        self.promote_button.setFixedSize(30, 24)
-        self.no_promote_button.setFixedSize(42, 24)
+        self.no_promote_button = QPushButton("不\n成", self.promotion_widget)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(2, 2, 2, 2)
@@ -102,17 +102,16 @@ class MainWindow(QMainWindow):
             QFrame#promotionWidget {
                 background-color: rgba(255, 255, 255, 210);
                 border: 1px solid #666666;
-                border-radius: 4px;
+                border-radius: 3px;
             }
             QFrame#promotionWidget QPushButton {
                 padding: 0px;
                 margin: 0px;
-                font-size: 11px;
+                font-weight: bold;
             }
             """
         )
 
-        self.promotion_widget.adjustSize()
         self.promotion_widget.hide()
 
     def _connect_signals(self) -> None:
@@ -159,16 +158,13 @@ class MainWindow(QMainWindow):
         if rect is None:
             return
 
-        self.promotion_widget.adjustSize()
+        self._update_promotion_widget_size(rect)
 
-        widget_width = self.promotion_widget.width()
-        widget_height = self.promotion_widget.height()
+        x = rect.left() + 2
+        y = rect.top() + 2
 
-        x = rect.center().x() - widget_width // 2
-        y = rect.bottom() - widget_height - 4
-
-        max_x = max(0, self.board_widget.width() - widget_width)
-        max_y = max(0, self.board_widget.height() - widget_height)
+        max_x = max(0, self.board_widget.width() - self.promotion_widget.width())
+        max_y = max(0, self.board_widget.height() - self.promotion_widget.height())
 
         x = max(0, min(x, max_x))
         y = max(0, min(y, max_y))
@@ -180,6 +176,30 @@ class MainWindow(QMainWindow):
 
         if self.promotion_widget.isVisible():
             self._reposition_promotion_widget()
+
+    
+    def _update_promotion_widget_size(self, rect) -> None:
+        widget_width = max(36, rect.width() - 4)
+        widget_height = max(36, rect.height() - 4)
+
+        self.promotion_widget.setFixedSize(widget_width, widget_height)
+
+        spacing = 2
+        margins = 4  # 左右合計 4
+        button_area_width = widget_width - margins - spacing
+        button_height = widget_height - 4
+
+        promote_width = max(16, button_area_width // 2)
+        no_promote_width = max(18, button_area_width - promote_width)
+
+        self.promote_button.setFixedSize(promote_width, button_height)
+        self.no_promote_button.setFixedSize(no_promote_width, button_height)
+
+        font = QFont()
+        font.setBold(True)
+        font.setPointSize(max(12, rect.height() // 4))
+        self.promote_button.setFont(font)
+        self.no_promote_button.setFont(font)
 
 
 if __name__ == "__main__":

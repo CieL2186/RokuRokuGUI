@@ -32,7 +32,7 @@ class Position:
         self.board.update(
             {
                 "6a": "r",
-                "5a": "b",
+                "5a": "l",
                 "4a": "g",
                 "3a": "s",
                 "2a": "n",
@@ -49,7 +49,7 @@ class Position:
                 "3e": "P",
                 "2e": "P",
                 "1e": "P",
-                "6f": "R",
+                "6f": "L",
                 "5f": "B",
                 "4f": "G",
                 "3f": "S",
@@ -84,8 +84,8 @@ class Position:
     def get_legal_moves_from(self, square: str) -> list[Move]:
         return rules.generate_legal_moves_from(self, square)
 
-    def get_all_legal_moves(self) -> list[Move]:
-        return rules.get_all_legal_moves(self)
+    def get_all_legal_moves(self, side: str | None = None) -> list[Move]:
+        return rules.get_all_legal_moves(self, side)
 
     def is_legal_move(self, move: Move) -> bool:
         if move.is_drop:
@@ -129,22 +129,31 @@ class Position:
         self.move_history = move_history
         return True
 
+    def is_in_check(self, side: str | None = None) -> bool:
+        target_side = self.side_to_move if side is None else side
+        return rules.is_in_check(self, target_side)
+
+    def is_checkmate(self, side: str | None = None) -> bool:
+        target_side = self.side_to_move if side is None else side
+        return rules.is_checkmate(self, target_side)
+
+    def has_any_legal_moves(self, side: str | None = None) -> bool:
+        return len(self.get_all_legal_moves(side)) > 0
+
     def is_game_over(self) -> bool:
-        black_king_exists = any(piece == "K" or piece == "bK" for piece in self.board.values())
-        white_king_exists = any(piece == "k" or piece == "wK" for piece in self.board.values())
-        return not black_king_exists or not white_king_exists
+        return self.is_checkmate(self.side_to_move)
 
     def get_game_result(self) -> str | None:
-        black_king_exists = any(piece == "K" or piece == "bK" for piece in self.board.values())
-        white_king_exists = any(piece == "k" or piece == "wK" for piece in self.board.values())
-
-        if black_king_exists and white_king_exists:
-            return None
-        if black_king_exists:
-            return "black"
-        if white_king_exists:
+        if self.is_checkmate("black"):
             return "white"
-        return "draw"
+        if self.is_checkmate("white"):
+            return "black"
+
+        # 将来的に持将棋や千日手等を扱うならここを拡張
+        if not self.has_any_legal_moves("black") or not self.has_any_legal_moves("white"):
+            return "draw"
+
+        return None
 
     def _push_undo_state(self) -> None:
         self._undo_stack.append(

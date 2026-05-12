@@ -188,54 +188,79 @@ def promote_piece(piece: str) -> str:
     if is_promoted(piece):
         return piece
 
-    if piece.startswith("b") or piece.startswith("w"):
-        prefix = piece[0]
-        body = piece[1:]
+    text = piece.strip()
+
+    # bP / wP 形式だけ接頭辞として扱う
+    # 1文字の "b" は後手角なので、ここに入れてはいけない
+    if len(text) >= 2 and text[0] in {"b", "w"}:
+        prefix = text[0]
+        body = text[1:]
         return f"{prefix}+{body.upper()}"
 
-    if piece.startswith("+"):
-        return piece
+    if text.startswith("+"):
+        return text
 
-    if piece.isupper():
-        return f"+{piece.upper()}"
-    return f"+{piece.lower()}"
+    if text.isupper():
+        return f"+{text.upper()}"
+
+    return f"+{text.lower()}"
 
 
 def unpromote_piece(piece: str) -> str:
-    if piece.startswith("b+") or piece.startswith("w+"):
-        return piece[0] + piece[2:]
+    text = piece.strip()
 
-    if piece.startswith("+"):
-        return piece[1:]
+    # b+P / w+P 形式
+    if len(text) >= 3 and text[0] in {"b", "w"} and text[1] == "+":
+        return text[0] + text[2:]
 
-    return piece
+    # +P / +p / +b 形式
+    if text.startswith("+"):
+        return text[1:]
+
+    return text
 
 
 def get_piece_side(piece: str) -> str:
-    if piece.startswith("b"):
-        return "black"
-    if piece.startswith("w"):
-        return "white"
+    text = piece.strip()
 
-    stripped = piece[1:] if piece.startswith("+") else piece
-    if stripped.isupper():
-        return "black"
-    return "white"
+    # bP / wP / b+P / w+P 形式だけ接頭辞として扱う
+    # 重要: 1文字の "b" は後手角なので black prefix として扱わない
+    if len(text) >= 2 and text[0] in {"b", "w"}:
+        return "black" if text[0] == "b" else "white"
+
+    # +P / +p / +b などの成り記号を外す
+    if text.startswith("+"):
+        text = text[1:]
+
+    return "black" if text.isupper() else "white"
 
 
 def get_base_piece(piece: str) -> str:
-    body = piece
-    if body.startswith("b") or body.startswith("w"):
-        body = body[1:]
-    if body.startswith("+"):
-        body = body[1:]
-    return body.upper()
+    text = piece.strip()
+
+    # bP / wP / b+P / w+P 形式
+    if len(text) >= 2 and text[0] in {"b", "w"}:
+        text = text[1:]
+        if text.startswith("+"):
+            text = text[1:]
+        return text.upper()
+
+    # +P / +p / +b 形式
+    if text.startswith("+"):
+        text = text[1:]
+
+    return text.upper()
 
 
 def is_promoted(piece: str) -> bool:
-    if piece.startswith("b+") or piece.startswith("w+"):
+    text = piece.strip()
+
+    # b+P / w+P 形式
+    if len(text) >= 3 and text[0] in {"b", "w"} and text[1] == "+":
         return True
-    return piece.startswith("+")
+
+    # +P / +p / +b 形式
+    return text.startswith("+")
 
 
 def square_to_index(square: str) -> tuple[int, int] | None:

@@ -179,7 +179,7 @@ class MainWindow(QMainWindow):
         self.white_hand_stand.hand_cancel_requested.connect(self.controller.cancel_hand_selection)
 
     def _on_new_game_clicked(self) -> None:
-        self.controller.new_game()
+        self.controller.new_game_from_settings(self.setting_dialog.get_settings())
 
     def _on_settings_clicked(self) -> None:
         if self.setting_dialog.exec():

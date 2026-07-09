@@ -106,6 +106,7 @@ class GameController:
         player = self.match_controller.current_player()
 
         if player is None or not player.is_human:
+            self._clear_promotion_ui()
             return
 
         player.handle_promotion_choice(promote)
@@ -271,11 +272,19 @@ class HumanPlayer:
 
     def handle_promotion_choice(self, promote: bool) -> None:
         if self._pending_promotion_moves is None:
+            self.game_controller._clear_promotion_ui()
             return
 
         move = self._pending_promotion_moves[promote]
+
         self.clear_selection()
-        self.game_controller.submit_human_move(move)
+        self.game_controller._clear_promotion_ui()
+        self.game_controller._clear_board_selection()
+        self.game_controller._notify_hand_selection(None, None)
+
+        success = self.game_controller.submit_human_move(move)
+        if not success:
+            self.game_controller._set_status("成りの手を指せませんでした。")
 
     def cancel_promotion_choice(self) -> None:
         self._pending_promotion_moves = None
@@ -302,7 +311,12 @@ class HumanPlayer:
         )
 
         if not self.position.is_legal_move(move):
-            self.game_controller._set_status("そのマスには打てません。")
+            if hasattr(rules, "get_drop_error_message"):
+                side = self.position.get_side_to_move()
+                message = rules.get_drop_error_message(self.position, move, side)
+                self.game_controller._set_status(message or "そのマスには打てません。")
+            else:
+                self.game_controller._set_status("そのマスには打てません。")
             return
 
         self.clear_selection()

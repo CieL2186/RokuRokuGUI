@@ -262,6 +262,110 @@ def is_promoted(piece: str) -> bool:
     # +P / +p / +b 形式
     return text.startswith("+")
 
+def get_drop_error_message(position: Position, move: Move, side: str) -> str | None:
+    """
+    持ち駒を打つ手が不合法な場合は理由を返す。
+    合法なら None を返す。
+    """
+    to_square = move.to_square
+    drop_piece = move.drop_piece
+
+    if to_square is None or drop_piece is None:
+        return "打ち駒の情報が不正です。"
+
+    if to_square not in position.board:
+        return "盤外には打てません。"
+
+    if position.get_piece_at(to_square) is not None:
+        return "駒のあるマスには打てません。"
+
+    base_piece = get_base_piece(str(drop_piece))
+
+    row_col = square_to_index(to_square)
+    if row_col is None:
+        return "盤外には打てません。"
+
+    row, _ = row_col
+
+    # 行き先のない駒
+    if base_piece in {"P", "L"}:
+        if side == "black" and row == 0:
+            return "行き先のない駒は打てません。"
+        if side == "white" and row == BOARD_SIZE - 1:
+            return "行き先のない駒は打てません。"
+
+    if base_piece == "N":
+        if side == "black" and row <= 1:
+            return "行き先のない桂馬は打てません。"
+        if side == "white" and row >= BOARD_SIZE - 2:
+            return "行き先のない桂馬は打てません。"
+
+    # 二歩
+    if base_piece == "P":
+        file_char = to_square[0]
+        if has_unpromoted_pawn_on_file(position, side, file_char):
+            return "二歩です。"
+
+    # 王手を受けているとき、その打ち駒で王手が解消されるか確認
+    board_piece = base_piece if side == "black" else base_piece.lower()
+    old_piece = position.get_piece_at(to_square)
+
+    position.set_piece_at(to_square, board_piece)
+    is_safe = not is_in_check(position, side)
+    position.set_piece_at(to_square, old_piece)
+
+    if not is_safe:
+        return "王手を回避できていません。"
+
+    return None
+
+
+def has_unpromoted_pawn_on_file(
+    position: Position,
+    side: str,
+    file_char: str,
+) -> bool:
+    """
+    指定した筋に、自分の未成歩があるかを返す。
+    成歩は二歩に数えない。
+    """
+    own_pawn = "P" if side == "black" else "p"
+
+    for rank_char in "abcdef":
+        square = f"{file_char}{rank_char}"
+        if position.get_piece_at(square) == own_pawn:
+            return True
+
+    return False
+
+
+def get_legal_drop_squares(
+    position: Position,
+    piece: str,
+    side: str,
+) -> list[str]:
+    """
+    持ち駒 piece を合法に打てるマス一覧を返す。
+    GUIのハイライト用。
+    """
+    result: list[str] = []
+
+    for square, board_piece in position.board.items():
+        if board_piece is not None:
+            continue
+
+        move = Move(
+            from_square=None,
+            to_square=square,
+            promote=False,
+            drop_piece=piece,
+        )
+
+        if get_drop_error_message(position, move, side) is None:
+            result.append(square)
+
+    return result
+
 
 def square_to_index(square: str) -> tuple[int, int] | None:
     if len(square) != 2:

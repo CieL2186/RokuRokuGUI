@@ -102,7 +102,10 @@ class USIProcess:
             )
 
         line = line.rstrip("\r\n")
-        self._log(f"< {line}")
+
+        if self._should_log_stdout_line(line):
+            self._log(f"< {line}")
+
         return line
 
     def stop(self) -> None:
@@ -158,3 +161,50 @@ class USIProcess:
             daemon=True,
         )
         self._stderr_thread.start()
+
+    def _should_log_stdout_line(self, line: str) -> bool:
+        if line == "":
+            return False
+
+        # USIとして重要なもの
+        if line == "usiok":
+            return True
+
+        if line == "readyok":
+            return True
+
+        if line.startswith("bestmove"):
+            return True
+
+        if line.startswith("info "):
+            return True
+
+        if line.startswith("id "):
+            return True
+
+        # option は全部出すと多すぎるので、重要なものだけ残す
+        if line.startswith("option name "):
+            important_options = [
+                "EvalDir",
+                "BookFile",
+                "BookDir",
+                "USI_OwnBook",
+                "Threads",
+                "USI_Hash",
+                "MultiPV",
+                "ResignValue",
+            ]
+            return any(f"option name {name}" in line for name in important_options)
+
+        # エラー系は残す
+        lower = line.lower()
+        if "error" in lower:
+            return True
+
+        if "can't read" in lower:
+            return True
+
+        if "failed" in lower:
+            return True
+
+        return False

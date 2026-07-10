@@ -24,6 +24,7 @@ class GameController:
         hand_selection_callback: Callable[[str | None, str | None], None] | None = None,
         promotion_request_callback: Callable[[str], None] | None = None,
         promotion_clear_callback: Callable[[], None] | None = None,
+        debug_log_callback: Callable[[str], None] | None = None,
     ) -> None:
         self._board_widget = board_widget
         self._move_list_widget = move_list_widget
@@ -34,6 +35,7 @@ class GameController:
         self._hand_selection_callback = hand_selection_callback
         self._promotion_request_callback = promotion_request_callback
         self._promotion_clear_callback = promotion_clear_callback
+        self._debug_log_callback = debug_log_callback
 
         self.match_controller = MatchController(
             on_position_changed=self._refresh_view,
@@ -65,24 +67,32 @@ class GameController:
         self.match_controller.new_game(position)
 
     def new_game_from_settings(self, settings: dict[str, str]) -> None:
-        black_player = self._create_player(
+        self.black_player = self._create_player(
             side="black",
             player_type=settings["black_player"],
             engine_path=settings.get("black_engine_path", ""),
         )
 
-        white_player = self._create_player(
+        self.white_player = self._create_player(
             side="white",
             player_type=settings["white_player"],
             engine_path=settings.get("white_engine_path", ""),
         )
 
-        self.match_controller.setup_players(black_player, white_player)
+        self.match_controller.setup_players(
+            self.black_player,
+            self.white_player,
+        )
         self.new_game()
+
 
     def _create_player(self, side: str, player_type: str, engine_path: str):
         if player_type == "AI":
-            return AIPlayer(side, engine_path)
+            return AIPlayer(
+                side=side,
+                engine_path=engine_path,
+                debug_log_callback=self._debug_log,
+            )
 
         return HumanPlayer(side, self)
 
@@ -160,6 +170,12 @@ class GameController:
     def _set_status(self, text: str) -> None:
         if self._status_callback is not None:
             self._status_callback(text)
+
+    def _debug_log(self, text: str) -> None:
+        if self._debug_log_callback is not None:
+            self._debug_log_callback(text)
+        else:
+            print(text)
 
     def _notify_hand_selection(self, side: str | None, piece: str | None) -> None:
         if self._hand_selection_callback is not None:
@@ -441,14 +457,25 @@ class HumanPlayer:
 class AIWorker(QObject):
     move_ready = Signal(object)
     error = Signal(str)
+    debug_log = Signal(str)
 
-    def __init__(self, engine_path: str, position_command: str) -> None:
+    def __init__(
+        self,
+        side: str,
+        engine_path: str,
+        position_command: str,
+    ) -> None:
         super().__init__()
+        self.side = side
         self.engine_path = engine_path
         self.position_command = position_command
 
     def run(self) -> None:
-        process = USIProcess(self.engine_path)
+        process = USIProcess(
+            self.engine_path,
+            engine_name=self.side,
+            log_callback=self.debug_log.emit,
+        )
 
         try:
             process.start()
@@ -461,17 +488,22 @@ class AIWorker(QObject):
             self.move_ready.emit(move)
 
         except Exception as exc:
+            self.debug_log.emit(f"[{self.side}] エラー: {exc}")
             self.error.emit(str(exc))
 
         finally:
             process.stop()
-
-
 class AIPlayer(QObject):
-    def __init__(self, side: str, engine_path: str) -> None:
+    def __init__(
+        self,
+        side: str,
+        engine_path: str,
+        debug_log_callback: Callable[[str], None] | None = None,
+    ) -> None:
         super().__init__()
         self.side = side
         self.engine_path = engine_path
+        self.debug_log_callback = debug_log_callback
         self.match_controller: MatchController | None = None
 
         self._thread: QThread | None = None
@@ -488,26 +520,55 @@ class AIPlayer(QObject):
         if self.match_controller is None:
             return
 
+        if self._thread is not None:
+            self._on_debug_log(f"[{self.side}] すでにAI思考中です。")
+            return
+
+        if not self.engine_path:
+            self._on_error("AIエンジンのパスが設定されていません。")
+            return
+
         position_command = self.match_controller.get_position_command()
 
         self._thread = QThread()
-        self._worker = AIWorker(self.engine_path, position_command)
+        self._worker = AIWorker(
+            side=self.side,
+            engine_path=self.engine_path,
+            position_command=position_command,
+        )
         self._worker.moveToThread(self._thread)
 
         self._thread.started.connect(self._worker.run)
+
+        self._worker.debug_log.connect(self._on_debug_log)
         self._worker.move_ready.connect(self._on_move_ready)
         self._worker.error.connect(self._on_error)
 
         self._worker.move_ready.connect(self._thread.quit)
         self._worker.error.connect(self._thread.quit)
+
+        self._thread.finished.connect(self._worker.deleteLater)
         self._thread.finished.connect(self._thread.deleteLater)
+        self._thread.finished.connect(self._clear_worker_refs)
 
         self._thread.start()
+
+    def _clear_worker_refs(self) -> None:
+        self._worker = None
+        self._thread = None
+
+    def _on_debug_log(self, text: str) -> None:
+        if self.debug_log_callback is not None:
+            self.debug_log_callback(text)
+        else:
+            print(text)
 
     def _on_move_ready(self, move: Move) -> None:
         if self.match_controller is not None:
             self.match_controller.submit_move(move)
 
     def _on_error(self, message: str) -> None:
+        self._on_debug_log(f"[{self.side}] AIエラー: {message}")
+
         if self.match_controller is not None:
             self.match_controller.set_status(f"AIエラー: {message}")

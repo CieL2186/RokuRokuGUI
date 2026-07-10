@@ -18,6 +18,7 @@ from source.gui.board_widget import BoardWidget
 from source.gui.hand_stand_widget import HandStandWidget
 from source.gui.move_list_widget import MoveListWidget
 from source.gui.setting_dialog import SettingDialog
+from source.gui.debug_window import DebugWindow
 
 
 class MainWindow(QMainWindow):
@@ -69,6 +70,9 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._setup_promotion_widget()
 
+        self.debug_window = DebugWindow()
+        self._setup_menu()
+
         self.controller = GameController(
             board_widget=self.board_widget,
             move_list_widget=self.move_list_widget,
@@ -79,9 +83,18 @@ class MainWindow(QMainWindow):
             hand_selection_callback=self._update_hand_selection,
             promotion_request_callback=self._show_promotion_buttons,
             promotion_clear_callback=self._hide_promotion_buttons,
+            debug_log_callback=self.debug_window.append_log,
         )
 
         self._connect_signals()
+
+    def _setup_menu(self) -> None:
+        menu_bar = self.menuBar()
+
+        view_menu = menu_bar.addMenu("表示(&V)")
+
+        self.debug_action = view_menu.addAction("デバッグウィンドウ(&D)")
+        self.debug_action.triggered.connect(self._show_debug_window)
 
     def _setup_ui(self) -> None:
         central_widget = QWidget()
@@ -296,6 +309,15 @@ class MainWindow(QMainWindow):
         font.setPointSize(max(12, rect.height() // 4))
         self.promote_button.setFont(font)
         self.no_promote_button.setFont(font)
+
+    # =========================
+    # デバッグUI
+    # =========================
+
+    def _show_debug_window(self) -> None:
+        self.debug_window.show()
+        self.debug_window.raise_()
+        self.debug_window.activateWindow()
 
 
 if __name__ == "__main__":

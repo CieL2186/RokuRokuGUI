@@ -17,7 +17,7 @@ from source.controller.game_controller import GameController
 from source.gui.board_widget import BoardWidget
 from source.gui.hand_stand_widget import HandStandWidget
 from source.gui.move_list_widget import MoveListWidget
-from source.gui.setting_dialog import SettingDialog
+from source.gui.match_setting_dialog import MatchSettingDialog
 from source.gui.debug_window import DebugWindow
 
 
@@ -54,16 +54,12 @@ class MainWindow(QMainWindow):
 
         self.move_list_widget = MoveListWidget()
 
-        self.new_game_button = QPushButton("新規対局")
-        self.settings_button = QPushButton("設定")
         self.undo_button = QPushButton("1手戻す")
 
         button_width = 220
-        self.new_game_button.setFixedWidth(button_width)
-        self.settings_button.setFixedWidth(button_width)
         self.undo_button.setFixedWidth(button_width)
 
-        self.setting_dialog = SettingDialog(self)
+        self.match_setting_dialog = MatchSettingDialog(self)
 
         self._promotion_square: str | None = None
 
@@ -90,6 +86,9 @@ class MainWindow(QMainWindow):
 
     def _setup_menu(self) -> None:
         menu_bar = self.menuBar()
+
+        self.match_action = menu_bar.addAction("対局(&G)")
+        self.match_action.triggered.connect(self._on_match_clicked)
 
         view_menu = menu_bar.addMenu("表示(&V)")
 
@@ -132,8 +131,6 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.status_label)
         right_layout.addWidget(self.turn_label)
         right_layout.addWidget(self.phase_label)
-        right_layout.addWidget(self.new_game_button)
-        right_layout.addWidget(self.settings_button)
         right_layout.addWidget(self.undo_button)
         right_layout.addStretch()
         right_layout.addWidget(self.black_hand_stand)
@@ -174,8 +171,6 @@ class MainWindow(QMainWindow):
         self.promotion_widget.hide()
 
     def _connect_signals(self) -> None:
-        self.new_game_button.clicked.connect(self._on_new_game_clicked)
-        self.settings_button.clicked.connect(self._on_settings_clicked)
         self.undo_button.clicked.connect(self._on_undo_clicked)
 
         self.promote_button.clicked.connect(
@@ -190,14 +185,6 @@ class MainWindow(QMainWindow):
 
         self.black_hand_stand.hand_cancel_requested.connect(self.controller.cancel_hand_selection)
         self.white_hand_stand.hand_cancel_requested.connect(self.controller.cancel_hand_selection)
-
-    def _on_new_game_clicked(self) -> None:
-        self.controller.new_game_from_settings(self.setting_dialog.get_settings())
-
-    def _on_settings_clicked(self) -> None:
-        if self.setting_dialog.exec():
-            settings = self.setting_dialog.get_settings()
-            self._set_status(f"設定を更新しました: {settings['game_mode']}")
 
     def _on_undo_clicked(self) -> None:
         self.controller.undo_move()
@@ -311,7 +298,17 @@ class MainWindow(QMainWindow):
         self.no_promote_button.setFont(font)
 
     # =========================
-    # デバッグUI
+    # 対局ウィンドウUI
+    # =========================
+
+    def _on_match_clicked(self) -> None:
+        if self.match_setting_dialog.exec():
+            settings = self.match_setting_dialog.get_settings()
+            self.controller.new_game_from_settings(settings)
+            self._set_status("対局を開始しました。")
+
+    # =========================
+    # デバッグウィンドウUI
     # =========================
 
     def _show_debug_window(self) -> None:

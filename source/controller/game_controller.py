@@ -8,6 +8,7 @@ from source.core import rules
 from source.core.move import Move
 from source.core.position import Position
 from source.controller.match_controller import MatchController
+from source.controller.match_clock import MatchClock
 from source.engine.usi_process import USIProcess
 from source.engine.usi_parser import USIParser
 
@@ -36,6 +37,8 @@ class GameController:
         self._promotion_request_callback = promotion_request_callback
         self._promotion_clear_callback = promotion_clear_callback
         self._debug_log_callback = debug_log_callback
+        self._match_settings: dict[str, object] = {}
+        self.match_clock: MatchClock | None = None
 
         self.match_controller = MatchController(
             on_position_changed=self._refresh_view,
@@ -66,17 +69,24 @@ class GameController:
 
         self.match_controller.new_game(position)
 
-    def new_game_from_settings(self, settings: dict[str, str]) -> None:
+    def new_game_from_settings(self, settings: dict[str, object]) -> None:
+        self._match_settings = settings
+        self.match_clock = MatchClock(settings)
+        self.match_controller.set_match_clock(self.match_clock)
+
+        #self._debug_log(f"[settings] {settings}")
+        #self._debug_log(f"[go option built] {self._go_option}")
+
         self.black_player = self._create_player(
             side="black",
-            player_type=settings["black_player"],
-            engine_path=settings.get("black_engine_path", ""),
+            player_type=str(settings["black_player"]),
+            engine_path=str(settings.get("black_engine_path", "")),
         )
 
         self.white_player = self._create_player(
             side="white",
-            player_type=settings["white_player"],
-            engine_path=settings.get("white_engine_path", ""),
+            player_type=str(settings["white_player"]),
+            engine_path=str(settings.get("white_engine_path", "")),
         )
 
         self.match_controller.setup_players(
@@ -92,11 +102,15 @@ class GameController:
                 side=side,
                 engine_path=engine_path,
                 debug_log_callback=self._debug_log,
+                go_option_provider=self._get_go_option,
             )
 
         return HumanPlayer(side, self)
 
     def handle_square_clicked(self, square: str) -> None:
+        if self.match_controller.is_ended():
+            return
+        
         player = self.match_controller.current_player()
 
         if player is None or not player.is_human:
@@ -177,6 +191,45 @@ class GameController:
         else:
             print(text)
 
+    def _build_go_option(self, settings: dict[str, object]) -> str:
+        time_mode = str(settings.get("time_mode", "none"))
+
+        if time_mode == "main_time":
+            hour = int(settings.get("main_time_hour", 0))
+            minute = int(settings.get("main_time_min", 10))
+            byoyomi_sec = int(settings.get("byoyomi_sec", 10))
+
+            main_ms = (hour * 60 + minute) * 60 * 1000
+            byoyomi_ms = max(byoyomi_sec * 1000, 0)
+
+            # 持ち時間0分・秒読み0秒だと危ないので最低1秒は渡す
+            if main_ms <= 0 and byoyomi_ms <= 0:
+                byoyomi_ms = 1000
+
+            return f"btime {main_ms} wtime {main_ms} byoyomi {byoyomi_ms}"
+
+        if time_mode == "byoyomi":
+            byoyomi_sec = int(settings.get("byoyomi_sec", 1))
+            byoyomi_ms = max(byoyomi_sec * 1000, 1000)
+
+            return f"btime 0 wtime 0 byoyomi {byoyomi_ms}"
+
+        if time_mode == "increment":
+            increment_sec = int(settings.get("increment_sec", 1))
+            increment_ms = max(increment_sec * 1000, 1000)
+
+            return f"btime 0 wtime 0 binc {increment_ms} winc {increment_ms}"
+
+        # 秒読みも加算もなし
+        # 今はAIが無限に考え続けるのを避けるため、仮で1秒思考にする
+        return "btime 0 wtime 0 byoyomi 1000"
+    
+    def _get_go_option(self) -> str:
+        if self.match_clock is None:
+            return "btime 1000 wtime 1000 byoyomi 1000"
+
+        return self.match_clock.make_go_option()
+
     def _notify_hand_selection(self, side: str | None, piece: str | None) -> None:
         if self._hand_selection_callback is not None:
             self._hand_selection_callback(side, piece)
@@ -205,6 +258,23 @@ class GameController:
     def _connect_board_signal(self) -> None:
         if hasattr(self._board_widget, "square_clicked"):
             self._board_widget.square_clicked.connect(self.handle_square_clicked)
+
+    def get_clock_display_text(self) -> str:
+        if self.match_clock is None:
+            return "先手: --:-- / 後手: --:--"
+
+        return self.match_clock.display_text()
+    
+    def is_ended(self) -> bool:
+        return self.game_state == "ended"
+    
+    def check_timeout(self) -> bool:
+        timed_out = self.match_controller.check_timeout()
+
+        if timed_out:
+            self._clear_board_selection()
+
+        return timed_out
 
     @staticmethod
     def _side_text(side: str) -> str:
@@ -272,6 +342,9 @@ class HumanPlayer:
         self.game_controller._set_status(f"{piece} を選択しました。")
 
     def handle_square_clicked(self, square: str) -> None:
+        if self.match_controller.is_ended():
+            return
+        
         if self._pending_promotion_moves is not None:
             self._handle_square_clicked_during_promotion(square)
             return
@@ -315,6 +388,9 @@ class HumanPlayer:
         self._pending_promotion_square = None
 
     def _handle_drop_click(self, square: str) -> None:
+        if self.match_controller.is_ended():
+            return
+        
         piece = self._selected_hand_piece
         if piece is None:
             return
@@ -341,6 +417,9 @@ class HumanPlayer:
         self.game_controller.submit_human_move(move)
 
     def _handle_battle_click(self, square: str) -> None:
+        if self.match_controller.is_ended():
+            return
+        
         piece = self.position.get_piece_at(square)
         current_side = self.position.get_side_to_move()
 
@@ -386,6 +465,9 @@ class HumanPlayer:
         self.game_controller._request_promotion(square)
 
     def _handle_square_clicked_during_promotion(self, square: str) -> None:
+        if self.match_controller.is_ended():
+            return
+        
         self.cancel_promotion_choice()
         self.handle_square_clicked(square)
 
@@ -464,11 +546,13 @@ class AIWorker(QObject):
         side: str,
         engine_path: str,
         position_command: str,
+        go_option: str,
     ) -> None:
         super().__init__()
         self.side = side
         self.engine_path = engine_path
         self.position_command = position_command
+        self.go_option = go_option
 
     def run(self) -> None:
         process = USIProcess(
@@ -484,7 +568,7 @@ class AIWorker(QObject):
             parser.initialize()
             parser.send(self.position_command)
 
-            move = parser.go()
+            move = parser.go(self.go_option)
             self.move_ready.emit(move)
 
         except Exception as exc:
@@ -499,11 +583,13 @@ class AIPlayer(QObject):
         side: str,
         engine_path: str,
         debug_log_callback: Callable[[str], None] | None = None,
+        go_option_provider: Callable[[], str] | None = None,
     ) -> None:
         super().__init__()
         self.side = side
         self.engine_path = engine_path
         self.debug_log_callback = debug_log_callback
+        self.go_option_provider = go_option_provider
         self.match_controller: MatchController | None = None
 
         self._thread: QThread | None = None
@@ -530,11 +616,20 @@ class AIPlayer(QObject):
 
         position_command = self.match_controller.get_position_command()
 
+        go_option = (
+            self.go_option_provider()
+            if self.go_option_provider is not None
+            else "btime 1000 wtime 1000 byoyomi 1000"
+        )
+
+        self._on_debug_log(f"[{self.side}] go option: {go_option}")
+
         self._thread = QThread()
         self._worker = AIWorker(
             side=self.side,
             engine_path=self.engine_path,
             position_command=position_command,
+            go_option=go_option,
         )
         self._worker.moveToThread(self._thread)
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont, QResizeEvent
 from PySide6.QtWidgets import (
     QFrame,
@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
 
 from source.controller.game_controller import GameController
 from source.gui.board_widget import BoardWidget
@@ -48,6 +49,8 @@ class MainWindow(QMainWindow):
             QSizePolicy.Policy.Fixed,
             QSizePolicy.Policy.Fixed,
         )
+        self.clock_label = QLabel("先手: --:-- / 後手: --:--")
+        self.clock_label.setFixedWidth(220)
 
         self.turn_label.setFixedWidth(220)
         self.phase_label.setFixedWidth(220)
@@ -68,6 +71,10 @@ class MainWindow(QMainWindow):
 
         self.debug_window = DebugWindow()
         self._setup_menu()
+
+        self.clock_timer = QTimer(self)
+        self.clock_timer.timeout.connect(self._update_clock_label)
+        self.clock_timer.start(200)
 
         self.controller = GameController(
             board_widget=self.board_widget,
@@ -131,6 +138,7 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.status_label)
         right_layout.addWidget(self.turn_label)
         right_layout.addWidget(self.phase_label)
+        right_layout.addWidget(self.clock_label)
         right_layout.addWidget(self.undo_button)
         right_layout.addStretch()
         right_layout.addWidget(self.black_hand_stand)
@@ -185,6 +193,10 @@ class MainWindow(QMainWindow):
 
         self.black_hand_stand.hand_cancel_requested.connect(self.controller.cancel_hand_selection)
         self.white_hand_stand.hand_cancel_requested.connect(self.controller.cancel_hand_selection)
+
+    def _update_clock_label(self) -> None:
+        self.clock_label.setText(self.controller.get_clock_display_text())
+        self.controller.check_timeout()
 
     def _on_undo_clicked(self) -> None:
         self.controller.undo_move()

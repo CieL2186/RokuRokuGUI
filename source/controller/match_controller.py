@@ -5,6 +5,7 @@ from collections.abc import Callable
 
 from source.core.move import Move
 from source.core.position import Position
+from source.controller.match_clock import MatchClock
 
 
 class GameState(Enum):
@@ -32,6 +33,8 @@ class MatchController:
         self.on_move_played = on_move_played
         self.on_status_changed = on_status_changed
         self.on_game_over = on_game_over
+        self.match_clock: MatchClock | None = None
+        self.game_state = "waiting"
 
     def setup_players(self, black_player, white_player) -> None:
         self.black_player = black_player
@@ -46,6 +49,7 @@ class MatchController:
         self._notify_position()
         self._set_status("新規対局を開始しました。")
         self.start_current_turn()
+        self.game_state = "playing"
 
     def current_side(self) -> str:
         return self.position.get_side_to_move()
@@ -63,22 +67,51 @@ class MatchController:
             self._set_status("プレイヤーが設定されていません。")
             return
 
+        side = self.position.get_side_to_move()
+
+        if self.match_clock is not None:
+            self.match_clock.start_turn(side)
+
         if player.is_human:
             self.state = GameState.WAIT_HUMAN
-            player.start_turn(self.position)
         else:
             self.state = GameState.WAIT_AI
-            player.start_turn(self.position)
+
+        player.start_turn(self.position)
 
     def submit_move(self, move: Move) -> bool:
-        if self.state == GameState.ENDED:
-            return False
+        if self.game_state == "ended":
+            return
+
+        if self.position is None:
+            return
+
+        if self.check_timeout():
+            return
 
         moving_side = self.current_side()
 
         if not self.position.do_move(move):
             self._set_status("不正な手です。")
             return False
+
+        if self.match_clock is not None:
+            clock_result = self.match_clock.finish_turn(moving_side)
+
+            if clock_result.timed_out:
+                winner = "white" if moving_side == "black" else "black"
+
+                if self.on_move_played is not None:
+                    self.on_move_played(moving_side, move)
+
+                self._notify_position()
+
+                self.state = GameState.ENDED
+                self._set_status(
+                    f"{self._side_label(moving_side)} 時間切れ。"
+                    f"{self._side_label(winner)} の勝ちです。"
+                )
+                return True
 
         if self.on_move_played is not None:
             self.on_move_played(moving_side, move)
@@ -93,7 +126,10 @@ class MatchController:
 
         self.start_current_turn()
         return True
-
+    
+    def _side_label(self, side: str) -> str:
+        return "先手" if side == "black" else "後手"
+    
     def undo_move(self) -> bool:
         if self.state == GameState.WAIT_AI:
             self._set_status("AI思考中は待ったできません。")
@@ -144,3 +180,35 @@ class MatchController:
     def _set_status(self, text: str) -> None:
         if self.on_status_changed is not None:
             self.on_status_changed(text)
+
+    def set_match_clock(self, match_clock: MatchClock | None) -> None:
+        self.match_clock = match_clock
+
+    def is_ended(self) -> bool:
+        return self.game_state == "ended"
+
+    def check_timeout(self) -> bool:
+        if self.position is None:
+            return False
+
+        if self.game_state == "ended":
+            return False
+
+        if self.match_clock is None:
+            return False
+
+        if not self.match_clock.is_current_turn_timeout():
+            return False
+
+        loser = self.match_clock.current_side or self.position.side_to_move
+        winner = "white" if loser == "black" else "black"
+
+        self.match_clock.stop_current_turn()
+        self.game_state = "ended"
+
+        self.set_status(
+            f"{self._side_label(loser)} 時間切れ。"
+            f"{self._side_label(winner)} の勝ちです。"
+        )
+
+        return True

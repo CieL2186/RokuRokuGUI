@@ -192,35 +192,70 @@ class MatchSettingDialog(QDialog):
         layout = QGridLayout()
         group.setLayout(layout)
 
+        def make_hour_spin(value: int = 0) -> QSpinBox:
+            spin = QSpinBox()
+            spin.setRange(0, 99)
+            spin.setValue(value)
+            return spin
+
+        def make_min_spin(value: int = 10) -> QSpinBox:
+            spin = QSpinBox()
+            spin.setRange(0, 59)
+            spin.setValue(value)
+            return spin
+
+        def make_sec_spin(value: int = 1) -> QSpinBox:
+            spin = QSpinBox()
+            spin.setRange(1, 999)
+            spin.setValue(value)
+            return spin
+
+        # =========================
+        # 持ち時間
+        # =========================
         self.time_main_radio = QRadioButton("持ち時間")
         self.time_main_radio.setChecked(True)
+
         self.time_common_check = QCheckBox("先手後手共通")
         self.time_common_check.setChecked(True)
 
-        self.main_hour_spin = QSpinBox()
-        self.main_hour_spin.setRange(0, 99)
-        self.main_hour_spin.setValue(0)
+        self.main_hour_spin = make_hour_spin(0)
+        self.main_min_spin = make_min_spin(10)
 
-        self.main_min_spin = QSpinBox()
-        self.main_min_spin.setRange(0, 59)
-        self.main_min_spin.setValue(10)
+        self.black_main_hour_spin = make_hour_spin(0)
+        self.black_main_min_spin = make_min_spin(10)
+        self.white_main_hour_spin = make_hour_spin(0)
+        self.white_main_min_spin = make_min_spin(10)
 
+        # =========================
+        # 秒読み
+        # =========================
         self.byoyomi_radio = QRadioButton("秒読み")
+
         self.byoyomi_common_check = QCheckBox("先手後手共通")
         self.byoyomi_common_check.setChecked(True)
 
-        self.byoyomi_sec_spin = QSpinBox()
-        self.byoyomi_sec_spin.setRange(1, 999)
-        self.byoyomi_sec_spin.setValue(1)
+        self.byoyomi_sec_spin = make_sec_spin(1)
 
+        self.black_byoyomi_sec_spin = make_sec_spin(1)
+        self.white_byoyomi_sec_spin = make_sec_spin(1)
+
+        # =========================
+        # 1手ごとの加算
+        # =========================
         self.increment_radio = QRadioButton("1手ごとの加算")
+
         self.increment_common_check = QCheckBox("先手後手共通")
         self.increment_common_check.setChecked(True)
 
-        self.increment_sec_spin = QSpinBox()
-        self.increment_sec_spin.setRange(1, 999)
-        self.increment_sec_spin.setValue(1)
+        self.increment_sec_spin = make_sec_spin(1)
 
+        self.black_increment_sec_spin = make_sec_spin(1)
+        self.white_increment_sec_spin = make_sec_spin(1)
+
+        # =========================
+        # なし
+        # =========================
         self.no_time_radio = QRadioButton("秒読みも加算もなし")
 
         self.time_button_group = QButtonGroup(self)
@@ -229,24 +264,76 @@ class MatchSettingDialog(QDialog):
         self.time_button_group.addButton(self.increment_radio)
         self.time_button_group.addButton(self.no_time_radio)
 
-        layout.addWidget(self.time_main_radio, 0, 0)
-        layout.addWidget(self.time_common_check, 0, 1, 1, 3)
-        layout.addWidget(self.main_hour_spin, 1, 1)
-        layout.addWidget(QLabel("時間"), 1, 2)
-        layout.addWidget(self.main_min_spin, 1, 3)
-        layout.addWidget(QLabel("分"), 1, 4)
+        row = 0
 
-        layout.addWidget(self.byoyomi_radio, 2, 0)
-        layout.addWidget(self.byoyomi_common_check, 2, 1, 1, 3)
-        layout.addWidget(self.byoyomi_sec_spin, 3, 1)
-        layout.addWidget(QLabel("秒"), 3, 2)
+        # 持ち時間
+        layout.addWidget(self.time_main_radio, row, 0)
+        layout.addWidget(self.time_common_check, row, 1, 1, 4)
+        row += 1
 
-        layout.addWidget(self.increment_radio, 4, 0)
-        layout.addWidget(self.increment_common_check, 4, 1, 1, 3)
-        layout.addWidget(self.increment_sec_spin, 5, 1)
-        layout.addWidget(QLabel("秒"), 5, 2)
+        layout.addWidget(QLabel("共通"), row, 1)
+        layout.addWidget(self.main_hour_spin, row, 2)
+        layout.addWidget(QLabel("時間"), row, 3)
+        layout.addWidget(self.main_min_spin, row, 4)
+        layout.addWidget(QLabel("分"), row, 5)
+        row += 1
 
-        layout.addWidget(self.no_time_radio, 6, 0, 1, 4)
+        layout.addWidget(QLabel("先手"), row, 1)
+        layout.addWidget(self.black_main_hour_spin, row, 2)
+        layout.addWidget(QLabel("時間"), row, 3)
+        layout.addWidget(self.black_main_min_spin, row, 4)
+        layout.addWidget(QLabel("分"), row, 5)
+        row += 1
+
+        layout.addWidget(QLabel("後手"), row, 1)
+        layout.addWidget(self.white_main_hour_spin, row, 2)
+        layout.addWidget(QLabel("時間"), row, 3)
+        layout.addWidget(self.white_main_min_spin, row, 4)
+        layout.addWidget(QLabel("分"), row, 5)
+        row += 1
+
+        # 秒読み
+        layout.addWidget(self.byoyomi_radio, row, 0)
+        layout.addWidget(self.byoyomi_common_check, row, 1, 1, 4)
+        row += 1
+
+        layout.addWidget(QLabel("共通"), row, 1)
+        layout.addWidget(self.byoyomi_sec_spin, row, 2)
+        layout.addWidget(QLabel("秒"), row, 3)
+        row += 1
+
+        layout.addWidget(QLabel("先手"), row, 1)
+        layout.addWidget(self.black_byoyomi_sec_spin, row, 2)
+        layout.addWidget(QLabel("秒"), row, 3)
+        row += 1
+
+        layout.addWidget(QLabel("後手"), row, 1)
+        layout.addWidget(self.white_byoyomi_sec_spin, row, 2)
+        layout.addWidget(QLabel("秒"), row, 3)
+        row += 1
+
+        # 1手ごとの加算
+        layout.addWidget(self.increment_radio, row, 0)
+        layout.addWidget(self.increment_common_check, row, 1, 1, 4)
+        row += 1
+
+        layout.addWidget(QLabel("共通"), row, 1)
+        layout.addWidget(self.increment_sec_spin, row, 2)
+        layout.addWidget(QLabel("秒"), row, 3)
+        row += 1
+
+        layout.addWidget(QLabel("先手"), row, 1)
+        layout.addWidget(self.black_increment_sec_spin, row, 2)
+        layout.addWidget(QLabel("秒"), row, 3)
+        row += 1
+
+        layout.addWidget(QLabel("後手"), row, 1)
+        layout.addWidget(self.white_increment_sec_spin, row, 2)
+        layout.addWidget(QLabel("秒"), row, 3)
+        row += 1
+
+        # なし
+        layout.addWidget(self.no_time_radio, row, 0, 1, 4)
 
         return group
 
@@ -348,56 +435,56 @@ class MatchSettingDialog(QDialog):
 
         self.position_file_button.clicked.connect(self._select_position_file)
         self.save_dir_button.clicked.connect(self._select_save_dir)
+        self.time_common_check.toggled.connect(self._refresh_enabled_state)
+        self.byoyomi_common_check.toggled.connect(self._refresh_enabled_state)
+        self.increment_common_check.toggled.connect(self._refresh_enabled_state)
 
     def _refresh_enabled_state(self) -> None:
-        black_is_engine = self.black_engine_radio.isChecked()
-        self.black_engine_combo.setEnabled(black_is_engine)
-        self.black_engine_button.setEnabled(black_is_engine)
-        self.black_name_edit.setEnabled(not black_is_engine)
-
-        white_is_engine = self.white_engine_radio.isChecked()
-        self.white_engine_combo.setEnabled(white_is_engine)
-        self.white_engine_button.setEnabled(white_is_engine)
-        self.white_name_edit.setEnabled(not white_is_engine)
-
-        file_mode = self.start_file_radio.isChecked()
-        self.position_file_label.setEnabled(file_mode)
-        self.position_file_edit.setEnabled(file_mode)
-        self.position_file_button.setEnabled(file_mode)
-        self.order_group.setEnabled(file_mode)
-        self.swap_side_each_position_check.setEnabled(file_mode)
-
-        self.initial_position_combo.setEnabled(self.start_initial_radio.isChecked())
-
         main_time = self.time_main_radio.isChecked()
         byoyomi = self.byoyomi_radio.isChecked()
         increment = self.increment_radio.isChecked()
 
+        # =========================
+        # 持ち時間
+        # =========================
         self.time_common_check.setEnabled(main_time)
-        self.main_hour_spin.setEnabled(main_time)
-        self.main_min_spin.setEnabled(main_time)
 
+        main_common = main_time and self.time_common_check.isChecked()
+        main_individual = main_time and not self.time_common_check.isChecked()
+
+        self.main_hour_spin.setEnabled(main_common)
+        self.main_min_spin.setEnabled(main_common)
+
+        self.black_main_hour_spin.setEnabled(main_individual)
+        self.black_main_min_spin.setEnabled(main_individual)
+        self.white_main_hour_spin.setEnabled(main_individual)
+        self.white_main_min_spin.setEnabled(main_individual)
+
+        # =========================
+        # 秒読み
+        # =========================
         self.byoyomi_common_check.setEnabled(byoyomi)
-        self.byoyomi_sec_spin.setEnabled(byoyomi)
 
+        byoyomi_common = byoyomi and self.byoyomi_common_check.isChecked()
+        byoyomi_individual = byoyomi and not self.byoyomi_common_check.isChecked()
+
+        self.byoyomi_sec_spin.setEnabled(byoyomi_common)
+
+        self.black_byoyomi_sec_spin.setEnabled(byoyomi_individual)
+        self.white_byoyomi_sec_spin.setEnabled(byoyomi_individual)
+
+        # =========================
+        # 1手ごとの加算
+        # =========================
         self.increment_common_check.setEnabled(increment)
-        self.increment_sec_spin.setEnabled(increment)
 
-        max_moves = self.max_moves_check.isChecked()
-        self.max_moves_spin.setEnabled(max_moves)
-        self.max_moves_label.setEnabled(max_moves)
+        increment_common = increment and self.increment_common_check.isChecked()
+        increment_individual = increment and not self.increment_common_check.isChecked()
 
-        continuous = self.continuous_check.isChecked()
-        self.continuous_games_label.setEnabled(continuous)
-        self.continuous_games_spin.setEnabled(continuous)
-        self.swap_side_each_game_check.setEnabled(continuous)
+        self.increment_sec_spin.setEnabled(increment_common)
 
-        auto_save = self.auto_save_check.isChecked()
-        self.save_dir_label.setEnabled(auto_save)
-        self.save_dir_edit.setEnabled(auto_save)
-        self.save_dir_button.setEnabled(auto_save)
-        self.kifu_format_label.setEnabled(auto_save)
-        self.kifu_format_combo.setEnabled(auto_save)
+        self.black_increment_sec_spin.setEnabled(increment_individual)
+        self.white_increment_sec_spin.setEnabled(increment_individual)
 
     def _select_engine_file(self, combo: QComboBox) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -441,6 +528,55 @@ class MatchSettingDialog(QDialog):
     # =========================
 
     def get_settings(self) -> dict[str, object]:
+        if self.time_main_radio.isChecked():
+            time_mode = "main_time"
+        elif self.byoyomi_radio.isChecked():
+            time_mode = "byoyomi"
+        elif self.increment_radio.isChecked():
+            time_mode = "increment"
+        else:
+            time_mode = "none"
+
+        # =========================
+        # 持ち時間
+        # =========================
+        main_time_common = self.time_common_check.isChecked()
+
+        if main_time_common:
+            black_main_hour = self.main_hour_spin.value()
+            black_main_min = self.main_min_spin.value()
+            white_main_hour = self.main_hour_spin.value()
+            white_main_min = self.main_min_spin.value()
+        else:
+            black_main_hour = self.black_main_hour_spin.value()
+            black_main_min = self.black_main_min_spin.value()
+            white_main_hour = self.white_main_hour_spin.value()
+            white_main_min = self.white_main_min_spin.value()
+
+        # =========================
+        # 秒読み
+        # =========================
+        byoyomi_common = self.byoyomi_common_check.isChecked()
+
+        if byoyomi_common:
+            black_byoyomi_sec = self.byoyomi_sec_spin.value()
+            white_byoyomi_sec = self.byoyomi_sec_spin.value()
+        else:
+            black_byoyomi_sec = self.black_byoyomi_sec_spin.value()
+            white_byoyomi_sec = self.white_byoyomi_sec_spin.value()
+
+        # =========================
+        # 1手ごとの加算
+        # =========================
+        increment_common = self.increment_common_check.isChecked()
+
+        if increment_common:
+            black_increment_sec = self.increment_sec_spin.value()
+            white_increment_sec = self.increment_sec_spin.value()
+        else:
+            black_increment_sec = self.black_increment_sec_spin.value()
+            white_increment_sec = self.white_increment_sec_spin.value()
+
         return {
             "black_player": "AI" if self.black_engine_radio.isChecked() else "Human",
             "black_name": self.black_name_edit.text().strip(),
@@ -456,11 +592,22 @@ class MatchSettingDialog(QDialog):
             "position_order": "random" if self.order_random_radio.isChecked() else "first",
             "swap_side_each_position": self.swap_side_each_position_check.isChecked(),
 
-            "time_mode": self._time_mode(),
-            "main_time_hour": self.main_hour_spin.value(),
-            "main_time_min": self.main_min_spin.value(),
-            "byoyomi_sec": self.byoyomi_sec_spin.value(),
-            "increment_sec": self.increment_sec_spin.value(),
+            # 時間設定
+            "time_mode": time_mode,
+
+            "main_time_common": main_time_common,
+            "black_main_time_hour": black_main_hour,
+            "black_main_time_min": black_main_min,
+            "white_main_time_hour": white_main_hour,
+            "white_main_time_min": white_main_min,
+
+            "byoyomi_common": byoyomi_common,
+            "black_byoyomi_sec": black_byoyomi_sec,
+            "white_byoyomi_sec": white_byoyomi_sec,
+
+            "increment_common": increment_common,
+            "black_increment_sec": black_increment_sec,
+            "white_increment_sec": white_increment_sec,
 
             "max_moves_enabled": self.max_moves_check.isChecked(),
             "max_moves": self.max_moves_spin.value(),

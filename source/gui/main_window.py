@@ -102,6 +102,10 @@ class MainWindow(QMainWindow):
         self.debug_action = view_menu.addAction("デバッグウィンドウ(&D)")
         self.debug_action.triggered.connect(self._show_debug_window)
 
+        self.flip_board_action = view_menu.addAction("手番表示反転(&F)")
+        self.flip_board_action.setCheckable(True)
+        self.flip_board_action.toggled.connect(self._on_flip_board_toggled)
+
     def _setup_ui(self) -> None:
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -111,12 +115,12 @@ class MainWindow(QMainWindow):
         root_layout.setSpacing(10)
         central_widget.setLayout(root_layout)
 
-        # 左: 後手駒台 + 棋譜
-        left_layout = QVBoxLayout()
-        left_layout.setSpacing(8)
-        left_layout.addWidget(self.white_hand_stand)
-        left_layout.addWidget(QLabel("棋譜"))
-        left_layout.addWidget(self.move_list_widget, stretch=1)
+        # 左: 駒台 + 棋譜
+        self.left_layout = QVBoxLayout()
+        self.left_layout.setSpacing(8)
+        self.left_layout.addWidget(self.white_hand_stand)
+        self.left_layout.addWidget(QLabel("棋譜"))
+        self.left_layout.addWidget(self.move_list_widget, stretch=1)
 
         # 中央: 盤
         center_layout = QVBoxLayout()
@@ -130,20 +134,20 @@ class MainWindow(QMainWindow):
         right_panel = QWidget()
         right_panel.setFixedWidth(230)
 
-        right_layout = QVBoxLayout()
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(6)
-        right_panel.setLayout(right_layout)
+        self.right_layout = QVBoxLayout()
+        self.right_layout.setContentsMargins(0, 0, 0, 0)
+        self.right_layout.setSpacing(6)
+        right_panel.setLayout(self.right_layout)
 
-        right_layout.addWidget(self.status_label)
-        right_layout.addWidget(self.turn_label)
-        right_layout.addWidget(self.phase_label)
-        right_layout.addWidget(self.clock_label)
-        right_layout.addWidget(self.undo_button)
-        right_layout.addStretch()
-        right_layout.addWidget(self.black_hand_stand)
+        self.right_layout.addWidget(self.status_label)
+        self.right_layout.addWidget(self.turn_label)
+        self.right_layout.addWidget(self.phase_label)
+        self.right_layout.addWidget(self.clock_label)
+        self.right_layout.addWidget(self.undo_button)
+        self.right_layout.addStretch()
+        self.right_layout.addWidget(self.black_hand_stand)
 
-        root_layout.addLayout(left_layout, stretch=0)
+        root_layout.addLayout(self.left_layout, stretch=0)
         root_layout.addLayout(center_layout, stretch=1)
         root_layout.addWidget(right_panel, stretch=0)
 
@@ -320,7 +324,7 @@ class MainWindow(QMainWindow):
             self._set_status("対局を開始しました。")
 
     # =========================
-    # デバッグウィンドウUI
+    # 表示UI
     # =========================
 
     def _show_debug_window(self) -> None:
@@ -328,6 +332,31 @@ class MainWindow(QMainWindow):
         self.debug_window.raise_()
         self.debug_window.activateWindow()
 
+    def _set_hand_stands_flipped(self, flipped: bool) -> None:
+        self.left_layout.removeWidget(self.black_hand_stand)
+        self.left_layout.removeWidget(self.white_hand_stand)
+        self.right_layout.removeWidget(self.black_hand_stand)
+        self.right_layout.removeWidget(self.white_hand_stand)
+
+        if flipped:
+            self.left_layout.insertWidget(0, self.black_hand_stand)
+            self.right_layout.addWidget(self.white_hand_stand)
+        else:
+            self.left_layout.insertWidget(0, self.white_hand_stand)
+            self.right_layout.addWidget(self.black_hand_stand)
+
+        self._refresh_hand_stands_state()
+
+    def _on_flip_board_toggled(self, checked: bool) -> None:
+        self.board_widget.set_flipped(checked)
+
+        self.black_hand_stand.set_flipped(checked)
+        self.white_hand_stand.set_flipped(checked)
+
+        self._set_hand_stands_flipped(checked)
+
+        if self.promotion_widget.isVisible():
+            self._reposition_promotion_widget()
 
 if __name__ == "__main__":
     from PySide6.QtWidgets import QApplication

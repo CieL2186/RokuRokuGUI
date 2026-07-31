@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QRect, Signal, QSize
-from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
+from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap, QTransform
 from PySide6.QtWidgets import QWidget
 
 
@@ -43,6 +43,7 @@ class HandStandWidget(QWidget):
         self.hands: dict[str, int] = {}
         self.selected_piece: str | None = None
         self.active = False
+        self._flipped = False
 
         base_dir = Path(__file__).resolve().parents[1]
         self.assets_dir = base_dir / "assets"
@@ -69,6 +70,10 @@ class HandStandWidget(QWidget):
 
     def set_active(self, active: bool) -> None:
         self.active = active
+        self.update()
+
+    def set_flipped(self, flipped: bool) -> None:
+        self._flipped = flipped
         self.update()
 
     def paintEvent(self, event) -> None:
@@ -188,7 +193,7 @@ class HandStandWidget(QWidget):
 
                     pixmap = self._get_piece_pixmap(piece)
                     if not pixmap.isNull():
-                        painter.drawPixmap(rect, pixmap)
+                        self._draw_piece_pixmap(painter, rect, pixmap)
                     else:
                         self._draw_fallback_piece(painter, rect, piece)
 
@@ -204,13 +209,43 @@ class HandStandWidget(QWidget):
             if self.selected_piece == piece:
                 self._draw_selected_frame(painter, union_rect)
 
+    def _draw_piece_pixmap(
+        self,
+        painter: QPainter,
+        rect: QRect,
+        pixmap: QPixmap,
+    ) -> None:
+        if pixmap.isNull():
+            return
+
+        if not self._flipped:
+            painter.drawPixmap(rect, pixmap)
+            return
+
+        transform = QTransform()
+        transform.rotate(180)
+
+        flipped_pixmap = pixmap.transformed(
+            transform,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+
+        painter.drawPixmap(rect, flipped_pixmap)
+
     def _draw_fallback_piece(self, painter: QPainter, rect: QRect, piece: str) -> None:
         painter.save()
+
+        if self._flipped:
+            painter.translate(rect.center())
+            painter.rotate(180)
+            painter.translate(-rect.center())
+
         painter.setBrush(QColor(245, 220, 150))
         painter.setPen(QPen(QColor(90, 55, 20), 1))
         painter.drawRoundedRect(rect, 4, 4)
         painter.setFont(QFont("Yu Gothic", 10, QFont.Weight.Bold))
         painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, piece)
+
         painter.restore()
 
     def _draw_selected_frame(self, painter: QPainter, rect: QRect) -> None:

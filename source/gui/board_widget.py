@@ -12,6 +12,7 @@ from PySide6.QtGui import (
     QPaintEvent,
     QPen,
     QPixmap,
+    QTransform,
 )
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
@@ -35,6 +36,7 @@ class BoardWidget(QWidget):
         self._board: dict[str, str | None] = self.create_empty_board()
         self._selected_square: str | None = None
         self._highlight_squares: set[str] = set()
+        self._flipped = False
 
         base_dir = Path(__file__).resolve().parents[1]
         self._assets_dir = base_dir / "assets"
@@ -79,6 +81,16 @@ class BoardWidget(QWidget):
     def set_legal_target_squares(self, squares: Iterable[str]) -> None:
         self.set_highlight_squares(squares)
 
+    def set_flipped(self, flipped: bool) -> None:
+        if self._flipped == flipped:
+            return
+
+        self._flipped = flipped
+        self.update()
+
+    def is_flipped(self) -> bool:
+        return self._flipped
+
     def clear_selection(self) -> None:
         self._selected_square = None
         self._highlight_squares.clear()
@@ -92,32 +104,37 @@ class BoardWidget(QWidget):
         square_w = self._square_width()
         square_h = self._square_height()
 
-        col = int((x - board_rect.left()) // square_w)
-        row = int((y - board_rect.top()) // square_h)
+        view_col = int((x - board_rect.left()) // square_w)
+        view_row = int((y - board_rect.top()) // square_h)
 
-        if not (0 <= col < self.BOARD_SIZE and 0 <= row < self.BOARD_SIZE):
+        if not (0 <= view_col < self.BOARD_SIZE and 0 <= view_row < self.BOARD_SIZE):
             return None
 
+        row, col = self._view_to_board_index(view_row, view_col)
         return self._index_to_square(row, col)
-    
+
+
     def get_square_rect(self, square: str) -> QRect | None:
         pos = self._square_to_index(square)
         if pos is None:
             return None
 
         row, col = pos
+        view_row, view_col = self._board_to_view_index(row, col)
+
         board_rect = self._board_rect()
         square_w = self._square_width()
         square_h = self._square_height()
 
         rect = QRectF(
-            board_rect.left() + col * square_w,
-            board_rect.top() + row * square_h,
+            board_rect.left() + view_col * square_w,
+            board_rect.top() + view_row * square_h,
             square_w,
             square_h,
         )
         return rect.toRect()
-    
+
+
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() != Qt.MouseButton.LeftButton:
             super().mousePressEvent(event)
@@ -195,21 +212,23 @@ class BoardWidget(QWidget):
 
         label_top = board_rect.top() - self.LABEL_MARGIN_TOP
         label_right = board_rect.right()
+        rank_labels = ["一", "二", "三", "四", "五", "六"]
 
-        # 上側: 6 5 4 3 2 1
-        for col in range(self.BOARD_SIZE):
-            file_num = str(self.BOARD_SIZE - col)
-            x = board_rect.left() + col * square_w
+        for view_col in range(self.BOARD_SIZE):
+            _, board_col = self._view_to_board_index(0, view_col)
+            file_num = str(self.BOARD_SIZE - board_col)
+
+            x = board_rect.left() + view_col * square_w
             rect = QRectF(x, label_top, square_w, self.LABEL_MARGIN_TOP)
             painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, file_num)
 
-        # 右側: 一 二 三 四 五 六
-        rank_labels = ["一", "二", "三", "四", "五", "六"]
+        for view_row in range(self.BOARD_SIZE):
+            board_row, _ = self._view_to_board_index(view_row, 0)
 
-        for row in range(self.BOARD_SIZE):
-            y = board_rect.top() + row * square_h
+            y = board_rect.top() + view_row * square_h
             rect = QRectF(label_right, y, self.LABEL_MARGIN_RIGHT, square_h)
-            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, rank_labels[row])
+            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, rank_labels[board_row])
+
 
     def _draw_highlights(self, painter: QPainter) -> None:
         board_rect = self._board_rect()
@@ -222,9 +241,11 @@ class BoardWidget(QWidget):
                 continue
 
             row, col = pos
+            view_row, view_col = self._board_to_view_index(row, col)
+
             rect = QRectF(
-                board_rect.left() + col * square_w,
-                board_rect.top() + row * square_h,
+                board_rect.left() + view_col * square_w,
+                board_rect.top() + view_row * square_h,
                 square_w,
                 square_h,
             )
@@ -234,15 +255,18 @@ class BoardWidget(QWidget):
             pos = self._square_to_index(self._selected_square)
             if pos is not None:
                 row, col = pos
+                view_row, view_col = self._board_to_view_index(row, col)
+
                 rect = QRectF(
-                    board_rect.left() + col * square_w,
-                    board_rect.top() + row * square_h,
+                    board_rect.left() + view_col * square_w,
+                    board_rect.top() + view_row * square_h,
                     square_w,
                     square_h,
                 )
                 painter.fillRect(rect, QColor(255, 220, 80, 120))
                 painter.setPen(QPen(QColor("#d18f00"), 3))
                 painter.drawRect(rect)
+
 
     def _draw_pieces(self, painter: QPainter) -> None:
         board_rect = self._board_rect()
@@ -258,9 +282,11 @@ class BoardWidget(QWidget):
                 continue
 
             row, col = pos
+            view_row, view_col = self._board_to_view_index(row, col)
+
             square_rect = QRectF(
-                board_rect.left() + col * square_w,
-                board_rect.top() + row * square_h,
+                board_rect.left() + view_col * square_w,
+                board_rect.top() + view_row * square_h,
                 square_w,
                 square_h,
             )
@@ -275,9 +301,12 @@ class BoardWidget(QWidget):
 
             pixmap = self._get_piece_pixmap(piece)
             if not pixmap.isNull():
+                if self._flipped:
+                    pixmap = pixmap.transformed(QTransform().rotate(180))
                 painter.drawPixmap(piece_rect, pixmap)
             else:
                 self._draw_fallback_piece(painter, square_rect, piece)
+
 
     def _draw_fallback_piece(
         self,
@@ -291,6 +320,18 @@ class BoardWidget(QWidget):
         painter.setFont(font)
         painter.setPen(self._piece_color(piece))
         painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, self._piece_display_text(piece))
+
+    def _board_to_view_index(self, row: int, col: int) -> tuple[int, int]:
+        if not self._flipped:
+            return row, col
+
+        return self.BOARD_SIZE - 1 - row, self.BOARD_SIZE - 1 - col
+
+    def _view_to_board_index(self, row: int, col: int) -> tuple[int, int]:
+        if not self._flipped:
+            return row, col
+
+        return self.BOARD_SIZE - 1 - row, self.BOARD_SIZE - 1 - col
 
     def _board_rect(self) -> QRectF:
         square_w = self._square_width()
@@ -342,9 +383,6 @@ class BoardWidget(QWidget):
     def _square_height(self) -> float:
         return self._square_width() * self.CELL_HEIGHT_RATIO
 
-
-    def _square_height(self) -> float:
-            return self._square_width() * self.CELL_HEIGHT_RATIO
 
     def _get_piece_pixmap(self, piece: str) -> QPixmap:
         filename = self._piece_to_filename(piece)

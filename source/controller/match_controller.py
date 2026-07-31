@@ -129,20 +129,46 @@ class MatchController:
     
     def _side_label(self, side: str) -> str:
         return "先手" if side == "black" else "後手"
-    
+        
     def undo_move(self) -> bool:
+        return self.undo_moves(1) > 0
+
+
+    def undo_moves(self, count: int) -> int:
         if self.state == GameState.WAIT_AI:
             self._set_status("AI思考中は待ったできません。")
-            return False
+            return 0
 
-        if not self.position.undo_move():
+        if count <= 0:
+            return 0
+
+        if self.match_clock is not None:
+            self.match_clock.stop_current_turn()
+
+        undone_count = 0
+
+        for _ in range(count):
+            if not self.position.undo_move():
+                break
+
+            undone_count += 1
+
+        if undone_count <= 0:
             self._set_status("これ以上戻せません。")
-            return False
+            return 0
+
+        self.game_state = "playing"
+        self.state = GameState.READY
 
         self._notify_position()
-        self._set_status("1手戻しました。")
+
+        if undone_count == 1:
+            self._set_status("1手戻しました。")
+        else:
+            self._set_status(f"{undone_count}手戻しました。")
+
         self.start_current_turn()
-        return True
+        return undone_count
 
     def get_position_command(self) -> str:
         history = self.position.get_move_history()

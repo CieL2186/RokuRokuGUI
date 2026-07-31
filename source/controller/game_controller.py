@@ -146,11 +146,20 @@ class GameController:
     def undo_move(self) -> None:
         self.clear_human_selection()
 
-        if self._move_list_widget is not None and hasattr(self._move_list_widget, "set_moves"):
-            # undo 成功後に MatchController 側の position から再構築する
-            pass
+        undo_count = 2 if self._is_human_vs_ai() else 1
 
-        self.match_controller.undo_move()
+        history = self.position.get_move_history()
+
+        if self._is_human_vs_ai() and len(history) < 2:
+            self._set_status("戻せる自分の手がまだありません。")
+            return
+
+        undone_count = self.match_controller.undo_moves(undo_count)
+
+        if undone_count <= 0:
+            return
+
+        self._rebuild_move_list()
 
     def submit_human_move(self, move: Move) -> bool:
         return self.match_controller.submit_move(move)
@@ -275,6 +284,30 @@ class GameController:
             self._clear_board_selection()
 
         return timed_out
+    
+    def _is_human_vs_ai(self) -> bool:
+        black_is_human = getattr(self.black_player, "is_human", False)
+        white_is_human = getattr(self.white_player, "is_human", False)
+
+        return black_is_human != white_is_human
+
+    def _rebuild_move_list(self) -> None:
+        if self._move_list_widget is None:
+            return
+
+        if not hasattr(self._move_list_widget, "clear_moves"):
+            return
+
+        if not hasattr(self._move_list_widget, "add_move"):
+            return
+
+        self._move_list_widget.clear_moves()
+
+        side = "black"
+
+        for move in self.position.get_move_history():
+            self._move_list_widget.add_move(side, move.to_usi())
+            side = "white" if side == "black" else "black"
 
     @staticmethod
     def _side_text(side: str) -> str:

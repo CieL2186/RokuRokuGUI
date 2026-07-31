@@ -29,7 +29,7 @@ class MatchSettingDialog(QDialog):
         super().__init__(parent)
 
         self.setWindowTitle("対局")
-        self.resize(850, 520)
+        self.resize(950, 560)
 
         self._setup_ui()
         self._connect_signals()
@@ -204,9 +204,20 @@ class MatchSettingDialog(QDialog):
             spin.setValue(value)
             return spin
 
-        def make_sec_spin(value: int = 1) -> QSpinBox:
+        def make_sec_spin(
+            value: int = 1,
+            minimum: int = 0,
+            maximum: int = 999,
+        ) -> QSpinBox:
             spin = QSpinBox()
-            spin.setRange(1, 999)
+            spin.setRange(minimum, maximum)
+            spin.setValue(value)
+            return spin
+
+        def make_ms_spin(value: int = 0) -> QSpinBox:
+            spin = QSpinBox()
+            spin.setRange(0, 999)
+            spin.setSingleStep(100)
             spin.setValue(value)
             return spin
 
@@ -235,10 +246,17 @@ class MatchSettingDialog(QDialog):
         self.byoyomi_common_check = QCheckBox("先手後手共通")
         self.byoyomi_common_check.setChecked(True)
 
-        self.byoyomi_sec_spin = make_sec_spin(1)
+        self.byoyomi_min_spin = make_min_spin(0)
+        self.byoyomi_sec_spin = make_sec_spin(5, 0, 59)
+        self.byoyomi_ms_spin = make_ms_spin(0)
 
-        self.black_byoyomi_sec_spin = make_sec_spin(1)
-        self.white_byoyomi_sec_spin = make_sec_spin(1)
+        self.black_byoyomi_min_spin = make_min_spin(0)
+        self.black_byoyomi_sec_spin = make_sec_spin(5, 0, 59)
+        self.black_byoyomi_ms_spin = make_ms_spin(0)
+
+        self.white_byoyomi_min_spin = make_min_spin(0)
+        self.white_byoyomi_sec_spin = make_sec_spin(5, 0, 59)
+        self.white_byoyomi_ms_spin = make_ms_spin(0)
 
         # =========================
         # 1手ごとの加算
@@ -248,10 +266,17 @@ class MatchSettingDialog(QDialog):
         self.increment_common_check = QCheckBox("先手後手共通")
         self.increment_common_check.setChecked(True)
 
-        self.increment_sec_spin = make_sec_spin(1)
+        self.increment_min_spin = make_min_spin(0)
+        self.increment_sec_spin = make_sec_spin(1, 0, 59)
+        self.increment_ms_spin = make_ms_spin(0)
 
-        self.black_increment_sec_spin = make_sec_spin(1)
-        self.white_increment_sec_spin = make_sec_spin(1)
+        self.black_increment_min_spin = make_min_spin(0)
+        self.black_increment_sec_spin = make_sec_spin(1, 0, 59)
+        self.black_increment_ms_spin = make_ms_spin(0)
+
+        self.white_increment_min_spin = make_min_spin(0)
+        self.white_increment_sec_spin = make_sec_spin(1, 0, 59)
+        self.white_increment_ms_spin = make_ms_spin(0)
 
         # =========================
         # なし
@@ -298,18 +323,30 @@ class MatchSettingDialog(QDialog):
         row += 1
 
         layout.addWidget(QLabel("共通"), row, 1)
-        layout.addWidget(self.byoyomi_sec_spin, row, 2)
-        layout.addWidget(QLabel("秒"), row, 3)
+        layout.addWidget(self.byoyomi_min_spin, row, 2)
+        layout.addWidget(QLabel("分"), row, 3)
+        layout.addWidget(self.byoyomi_sec_spin, row, 4)
+        layout.addWidget(QLabel("秒"), row, 5)
+        layout.addWidget(self.byoyomi_ms_spin, row, 6)
+        layout.addWidget(QLabel("ms"), row, 7)
         row += 1
 
         layout.addWidget(QLabel("先手"), row, 1)
-        layout.addWidget(self.black_byoyomi_sec_spin, row, 2)
-        layout.addWidget(QLabel("秒"), row, 3)
+        layout.addWidget(self.black_byoyomi_min_spin, row, 2)
+        layout.addWidget(QLabel("分"), row, 3)
+        layout.addWidget(self.black_byoyomi_sec_spin, row, 4)
+        layout.addWidget(QLabel("秒"), row, 5)
+        layout.addWidget(self.black_byoyomi_ms_spin, row, 6)
+        layout.addWidget(QLabel("ms"), row, 7)
         row += 1
 
         layout.addWidget(QLabel("後手"), row, 1)
-        layout.addWidget(self.white_byoyomi_sec_spin, row, 2)
-        layout.addWidget(QLabel("秒"), row, 3)
+        layout.addWidget(self.white_byoyomi_min_spin, row, 2)
+        layout.addWidget(QLabel("分"), row, 3)
+        layout.addWidget(self.white_byoyomi_sec_spin, row, 4)
+        layout.addWidget(QLabel("秒"), row, 5)
+        layout.addWidget(self.white_byoyomi_ms_spin, row, 6)
+        layout.addWidget(QLabel("ms"), row, 7)
         row += 1
 
         # 1手ごとの加算
@@ -318,18 +355,30 @@ class MatchSettingDialog(QDialog):
         row += 1
 
         layout.addWidget(QLabel("共通"), row, 1)
-        layout.addWidget(self.increment_sec_spin, row, 2)
-        layout.addWidget(QLabel("秒"), row, 3)
+        layout.addWidget(self.increment_min_spin, row, 2)
+        layout.addWidget(QLabel("分"), row, 3)
+        layout.addWidget(self.increment_sec_spin, row, 4)
+        layout.addWidget(QLabel("秒"), row, 5)
+        layout.addWidget(self.increment_ms_spin, row, 6)
+        layout.addWidget(QLabel("ms"), row, 7)
         row += 1
 
         layout.addWidget(QLabel("先手"), row, 1)
-        layout.addWidget(self.black_increment_sec_spin, row, 2)
-        layout.addWidget(QLabel("秒"), row, 3)
+        layout.addWidget(self.black_increment_min_spin, row, 2)
+        layout.addWidget(QLabel("分"), row, 3)
+        layout.addWidget(self.black_increment_sec_spin, row, 4)
+        layout.addWidget(QLabel("秒"), row, 5)
+        layout.addWidget(self.black_increment_ms_spin, row, 6)
+        layout.addWidget(QLabel("ms"), row, 7)
         row += 1
 
         layout.addWidget(QLabel("後手"), row, 1)
-        layout.addWidget(self.white_increment_sec_spin, row, 2)
-        layout.addWidget(QLabel("秒"), row, 3)
+        layout.addWidget(self.white_increment_min_spin, row, 2)
+        layout.addWidget(QLabel("分"), row, 3)
+        layout.addWidget(self.white_increment_sec_spin, row, 4)
+        layout.addWidget(QLabel("秒"), row, 5)
+        layout.addWidget(self.white_increment_ms_spin, row, 6)
+        layout.addWidget(QLabel("ms"), row, 7)
         row += 1
 
         # なし
@@ -468,10 +517,17 @@ class MatchSettingDialog(QDialog):
         byoyomi_common = byoyomi and self.byoyomi_common_check.isChecked()
         byoyomi_individual = byoyomi and not self.byoyomi_common_check.isChecked()
 
+        self.byoyomi_min_spin.setEnabled(byoyomi_common)
         self.byoyomi_sec_spin.setEnabled(byoyomi_common)
+        self.byoyomi_ms_spin.setEnabled(byoyomi_common)
 
+        self.black_byoyomi_min_spin.setEnabled(byoyomi_individual)
         self.black_byoyomi_sec_spin.setEnabled(byoyomi_individual)
+        self.black_byoyomi_ms_spin.setEnabled(byoyomi_individual)
+
+        self.white_byoyomi_min_spin.setEnabled(byoyomi_individual)
         self.white_byoyomi_sec_spin.setEnabled(byoyomi_individual)
+        self.white_byoyomi_ms_spin.setEnabled(byoyomi_individual)
 
         # =========================
         # 1手ごとの加算
@@ -481,10 +537,17 @@ class MatchSettingDialog(QDialog):
         increment_common = increment and self.increment_common_check.isChecked()
         increment_individual = increment and not self.increment_common_check.isChecked()
 
+        self.increment_min_spin.setEnabled(increment_common)
         self.increment_sec_spin.setEnabled(increment_common)
+        self.increment_ms_spin.setEnabled(increment_common)
 
+        self.black_increment_min_spin.setEnabled(increment_individual)
         self.black_increment_sec_spin.setEnabled(increment_individual)
+        self.black_increment_ms_spin.setEnabled(increment_individual)
+
+        self.white_increment_min_spin.setEnabled(increment_individual)
         self.white_increment_sec_spin.setEnabled(increment_individual)
+        self.white_increment_ms_spin.setEnabled(increment_individual)
 
     def _select_engine_file(self, combo: QComboBox) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -527,6 +590,18 @@ class MatchSettingDialog(QDialog):
     # settings
     # =========================
 
+    def _time_to_ms(
+        self,
+        minute_spin: QSpinBox,
+        sec_spin: QSpinBox,
+        ms_spin: QSpinBox,
+    ) -> int:
+        return (
+            minute_spin.value() * 60 * 1000
+            + sec_spin.value() * 1000
+            + ms_spin.value()
+        )
+
     def get_settings(self) -> dict[str, object]:
         if self.time_main_radio.isChecked():
             time_mode = "main_time"
@@ -559,11 +634,23 @@ class MatchSettingDialog(QDialog):
         byoyomi_common = self.byoyomi_common_check.isChecked()
 
         if byoyomi_common:
-            black_byoyomi_sec = self.byoyomi_sec_spin.value()
-            white_byoyomi_sec = self.byoyomi_sec_spin.value()
+            black_byoyomi_ms = self._time_to_ms(
+                self.byoyomi_min_spin,
+                self.byoyomi_sec_spin,
+                self.byoyomi_ms_spin,
+            )
+            white_byoyomi_ms = black_byoyomi_ms
         else:
-            black_byoyomi_sec = self.black_byoyomi_sec_spin.value()
-            white_byoyomi_sec = self.white_byoyomi_sec_spin.value()
+            black_byoyomi_ms = self._time_to_ms(
+                self.black_byoyomi_min_spin,
+                self.black_byoyomi_sec_spin,
+                self.black_byoyomi_ms_spin,
+            )
+            white_byoyomi_ms = self._time_to_ms(
+                self.white_byoyomi_min_spin,
+                self.white_byoyomi_sec_spin,
+                self.white_byoyomi_ms_spin,
+            )
 
         # =========================
         # 1手ごとの加算
@@ -571,11 +658,23 @@ class MatchSettingDialog(QDialog):
         increment_common = self.increment_common_check.isChecked()
 
         if increment_common:
-            black_increment_sec = self.increment_sec_spin.value()
-            white_increment_sec = self.increment_sec_spin.value()
+            black_increment_ms = self._time_to_ms(
+                self.increment_min_spin,
+                self.increment_sec_spin,
+                self.increment_ms_spin,
+            )
+            white_increment_ms = black_increment_ms
         else:
-            black_increment_sec = self.black_increment_sec_spin.value()
-            white_increment_sec = self.white_increment_sec_spin.value()
+            black_increment_ms = self._time_to_ms(
+                self.black_increment_min_spin,
+                self.black_increment_sec_spin,
+                self.black_increment_ms_spin,
+            )
+            white_increment_ms = self._time_to_ms(
+                self.white_increment_min_spin,
+                self.white_increment_sec_spin,
+                self.white_increment_ms_spin,
+            )
 
         return {
             "black_player": "AI" if self.black_engine_radio.isChecked() else "Human",
@@ -602,12 +701,20 @@ class MatchSettingDialog(QDialog):
             "white_main_time_min": white_main_min,
 
             "byoyomi_common": byoyomi_common,
-            "black_byoyomi_sec": black_byoyomi_sec,
-            "white_byoyomi_sec": white_byoyomi_sec,
+            "black_byoyomi_ms": black_byoyomi_ms,
+            "white_byoyomi_ms": white_byoyomi_ms,
+
+            # 互換用。古いMatchClockがまだsecを読んでいても落ちないように残す。
+            "black_byoyomi_sec": black_byoyomi_ms // 1000,
+            "white_byoyomi_sec": white_byoyomi_ms // 1000,
 
             "increment_common": increment_common,
-            "black_increment_sec": black_increment_sec,
-            "white_increment_sec": white_increment_sec,
+            "black_increment_ms": black_increment_ms,
+            "white_increment_ms": white_increment_ms,
+
+            # 互換用
+            "black_increment_sec": black_increment_ms // 1000,
+            "white_increment_sec": white_increment_ms // 1000,
 
             "max_moves_enabled": self.max_moves_check.isChecked(),
             "max_moves": self.max_moves_spin.value(),

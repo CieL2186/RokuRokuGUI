@@ -32,25 +32,18 @@ class MatchClock:
         # =========================
         # 秒読み：先手・後手別
         # =========================
-        black_byoyomi_sec = int(settings.get("black_byoyomi_sec", settings.get("byoyomi_sec", 0)))
-        white_byoyomi_sec = int(settings.get("white_byoyomi_sec", settings.get("byoyomi_sec", 0)))
-
         self.byoyomi_ms: dict[Side, int] = {
-            "black": max(black_byoyomi_sec * 1000, 0),
-            "white": max(white_byoyomi_sec * 1000, 0),
+            "black": self._read_byoyomi_ms(settings, "black"),
+            "white": self._read_byoyomi_ms(settings, "white"),
         }
 
         # =========================
         # 1手ごとの加算：先手・後手別
         # =========================
-        black_increment_sec = int(settings.get("black_increment_sec", settings.get("increment_sec", 0)))
-        white_increment_sec = int(settings.get("white_increment_sec", settings.get("increment_sec", 0)))
-
         self.increment_ms: dict[Side, int] = {
-            "black": max(black_increment_sec * 1000, 0),
-            "white": max(white_increment_sec * 1000, 0),
+            "black": self._read_increment_ms(settings, "black"),
+            "white": self._read_increment_ms(settings, "white"),
         }
-
         self.lose_on_time = bool(settings.get("lose_on_time", False))
 
         # =========================
@@ -68,11 +61,11 @@ class MatchClock:
                 "white": 0,
             }
 
-            # 秒読み0秒だと即時間切れになるので最低1秒にする
-            if self.byoyomi_ms["black"] <= 0:
-                self.byoyomi_ms["black"] = 1000
-            if self.byoyomi_ms["white"] <= 0:
-                self.byoyomi_ms["white"] = 1000
+        # 0msだとエンジンが即返し/不安定になる可能性があるので最低1msにする
+        if self.byoyomi_ms["black"] <= 0:
+            self.byoyomi_ms["black"] = 1
+        if self.byoyomi_ms["white"] <= 0:
+            self.byoyomi_ms["white"] = 1
 
         elif self.time_mode == "increment":
             self.remaining_ms = {
@@ -82,9 +75,9 @@ class MatchClock:
 
             # 加算0秒だと実用上扱いにくいので最低1秒にする
             if self.increment_ms["black"] <= 0:
-                self.increment_ms["black"] = 1000
+                self.increment_ms["black"] = 1
             if self.increment_ms["white"] <= 0:
-                self.increment_ms["white"] = 1000
+                self.increment_ms["white"] = 1
 
         else:
             self.remaining_ms = {
@@ -94,6 +87,36 @@ class MatchClock:
 
         self.current_side: Side | None = None
         self.turn_started_at: float | None = None
+
+    def _read_increment_ms(self, settings: dict[str, object], side: Side) -> int:
+        ms_key = f"{side}_increment_ms"
+        sec_key = f"{side}_increment_sec"
+
+        # 新形式：GUIから直接msで来る
+        if ms_key in settings:
+            return max(int(settings.get(ms_key, 0)), 0)
+
+        # 互換用：共通ms
+        if "increment_ms" in settings:
+            return max(int(settings.get("increment_ms", 0)), 0)
+
+        # 旧形式：秒単位
+        return max(int(settings.get(sec_key, settings.get("increment_sec", 0))) * 1000, 0)
+
+    def _read_byoyomi_ms(self, settings: dict[str, object], side: Side) -> int:
+        ms_key = f"{side}_byoyomi_ms"
+        sec_key = f"{side}_byoyomi_sec"
+
+        # 新形式：GUIから直接msで来る
+        if ms_key in settings:
+            return max(int(settings.get(ms_key, 0)), 0)
+
+        # 互換用：共通ms
+        if "byoyomi_ms" in settings:
+            return max(int(settings.get("byoyomi_ms", 0)), 0)
+
+        # 旧形式：秒単位
+        return max(int(settings.get(sec_key, settings.get("byoyomi_sec", 0))) * 1000, 0)
 
     def start_turn(self, side: Side) -> None:
         self.current_side = side
@@ -156,7 +179,7 @@ class MatchClock:
             )
 
         if self.time_mode == "byoyomi":
-            byoyomi_ms = max(self.byoyomi_ms[side], 1000)
+            byoyomi_ms = max(self.byoyomi_ms[side], 1)
             return f"btime 0 wtime 0 byoyomi {byoyomi_ms}"
 
         if self.time_mode == "increment":
@@ -183,7 +206,18 @@ class MatchClock:
         if ms is None:
             return "無制限"
 
-        total_sec = max(0, ms // 1000)
+        return self._format_time(ms)
+
+    def _format_time(self, ms: int) -> str:
+        ms = max(0, ms)
+
+        if ms < 1000:
+            return f"{ms}ms"
+
+        if ms < 10_000:
+            return f"{ms / 1000:.1f}秒"
+
+        total_sec = ms // 1000
         minute = total_sec // 60
         second = total_sec % 60
 

@@ -33,7 +33,7 @@ class USIParser:
         self.send(f"position startpos moves {move_text}")
 
     def go(self, option: str = "btime 1000 wtime 1000 byoyomi 1000") -> Move:
-        self.send(f"go {option}")
+        self.send(f"go depth 1")
 
         while True:
             line = self.process.read_line()

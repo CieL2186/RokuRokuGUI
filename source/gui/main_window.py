@@ -168,14 +168,27 @@ class MainWindow(QMainWindow):
         self.promotion_widget.setStyleSheet(
             """
             QFrame#promotionWidget {
-                background-color: rgba(255, 255, 255, 210);
-                border: 1px solid #666666;
-                border-radius: 3px;
+                background-color: rgba(255, 255, 255, 230);
+                border: 1px solid #6b4a20;
+                border-radius: 4px;
             }
+
             QFrame#promotionWidget QPushButton {
+                color: #111111;
+                background-color: #f0d49a;
+                border: 1px solid #7a4a20;
+                border-radius: 4px;
                 padding: 0px;
                 margin: 0px;
                 font-weight: bold;
+            }
+
+            QFrame#promotionWidget QPushButton:hover {
+                background-color: #f7e3b4;
+            }
+
+            QFrame#promotionWidget QPushButton:pressed {
+                background-color: #d8b873;
             }
             """
         )

@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QRadioButton,
+    QScrollArea,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -29,7 +30,7 @@ class MatchSettingDialog(QDialog):
         super().__init__(parent)
 
         self.setWindowTitle("対局")
-        self.resize(950, 560)
+        self.resize(1100, 620)
 
         self._setup_ui()
         self._connect_signals()
@@ -39,8 +40,16 @@ class MatchSettingDialog(QDialog):
         root_layout = QVBoxLayout()
         self.setLayout(root_layout)
 
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+
+        scroll_content = QWidget()
+        scroll_area.setWidget(scroll_content)
+
         main_layout = QHBoxLayout()
-        root_layout.addLayout(main_layout)
+        scroll_content.setLayout(main_layout)
+
+        root_layout.addWidget(scroll_area)
 
         left_layout = QVBoxLayout()
         right_layout = QVBoxLayout()
@@ -51,12 +60,12 @@ class MatchSettingDialog(QDialog):
         left_layout.addWidget(self._create_black_group())
         left_layout.addWidget(self._create_white_group())
         left_layout.addWidget(self._create_start_position_group())
+        left_layout.addWidget(self._create_kifu_save_group())
         left_layout.addStretch()
 
         right_layout.addWidget(self._create_time_group())
         right_layout.addWidget(self._create_match_option_group())
         right_layout.addWidget(self._create_continuous_group())
-        right_layout.addWidget(self._create_kifu_save_group())
         right_layout.addStretch()
 
         button_box = QDialogButtonBox(

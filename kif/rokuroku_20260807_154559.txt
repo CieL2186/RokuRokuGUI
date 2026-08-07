@@ -1,0 +1,46 @@
+# RokuRokuGUI Kif
+date: 2026-08-07 15:45:59
+black_player: AI
+white_player: AI
+result: black
+
+moves:
+1. black K*1f
+2. white K*1a
+3. black N*2f
+4. white N*2a
+5. black L*3f
+6. white L*3a
+7. black S*4f
+8. white S*4a
+9. black G*5f
+10. white G*5a
+11. black B*6f
+12. white B*6a
+13. black 1e1d
+14. white 1b1c
+15. black 1d1c
+16. white 2a1c
+17. black 2e2d
+18. white 3b3c
+19. black 3e3d
+20. white 3c3d
+21. black 3f3d
+22. white 3a3d
+23. black 2f3d
+24. white 4b4c
+25. black 5e5d
+26. white L*1d
+27. black 1f2f
+28. white 4c4d
+29. black 4e4d
+30. white 5b5c
+31. black 4d4c
+32. white P*3c
+33. black 6f3c
+34. white 1d1e+
+35. black 2f1e
+36. white P*1d
+37. black 1e1d
+38. white 5a5b
+39. black 3d2b+

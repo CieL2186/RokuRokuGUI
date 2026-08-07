@@ -11,6 +11,7 @@ from source.controller.match_controller import MatchController
 from source.controller.match_clock import MatchClock
 from source.engine.usi_process import USIProcess
 from source.engine.usi_parser import USIParser
+from source.core.kif_write import KifuWriter
 
 
 class GameController:
@@ -39,11 +40,13 @@ class GameController:
         self._debug_log_callback = debug_log_callback
         self._match_settings: dict[str, object] = {}
         self.match_clock: MatchClock | None = None
+        self.kifu_writer = KifuWriter()
 
         self.match_controller = MatchController(
             on_position_changed=self._refresh_view,
             on_move_played=self._add_move_to_list,
             on_status_changed=self._set_status,
+            on_game_over=self._on_game_over,
         )
 
         self.black_player = HumanPlayer("black", self)
@@ -95,6 +98,16 @@ class GameController:
         )
         self.new_game()
 
+    def _on_game_over(self, result: str | None) -> None:
+            try:
+                path = self.kifu_writer.save_txt(
+                    position=self.position,
+                    result=result,
+                    settings=self._match_settings,
+                )
+                self._set_status(f"対局終了。棋譜を保存しました: {path}")
+            except Exception as exc:
+                self._set_status(f"対局終了。棋譜保存に失敗しました: {exc}")
 
     def _create_player(self, side: str, player_type: str, engine_path: str):
         if player_type == "AI":
@@ -700,3 +713,4 @@ class AIPlayer(QObject):
 
         if self.match_controller is not None:
             self.match_controller.set_status(f"AIエラー: {message}")
+    

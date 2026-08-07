@@ -183,6 +183,7 @@ class MatchController:
 
     def _finish_game(self) -> None:
         self.state = GameState.ENDED
+        self.game_state = "ended"
         result = self.position.get_game_result()
 
         if result == "black":

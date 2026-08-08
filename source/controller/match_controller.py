@@ -3,6 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from collections.abc import Callable
 
+from source.core import rules
 from source.core.move import Move
 from source.core.position import Position
 from source.controller.match_clock import MatchClock
@@ -58,7 +59,9 @@ class MatchController:
         return self.black_player if self.current_side() == "black" else self.white_player
 
     def start_current_turn(self) -> None:
-        if self.position.is_game_over():
+        side = self.position.get_side_to_move()
+
+        if self._is_real_checkmate(side):
             self._finish_game()
             return
 
@@ -66,8 +69,6 @@ class MatchController:
         if player is None:
             self._set_status("プレイヤーが設定されていません。")
             return
-
-        side = self.position.get_side_to_move()
 
         if self.match_clock is not None:
             self.match_clock.start_turn(side)
@@ -120,7 +121,7 @@ class MatchController:
 
         next_side = self.current_side()
 
-        if self.position.is_checkmate(next_side):
+        if self._is_real_checkmate(next_side):
             self._finish_game()
             return True
 
@@ -129,6 +130,73 @@ class MatchController:
     
     def _side_label(self, side: str) -> str:
         return "先手" if side == "black" else "後手"
+
+    def _is_real_checkmate(self, side: str) -> bool:
+        is_checkmate = self.position.is_checkmate(side)
+        has_legal_move = self._has_any_legal_move(side)
+
+        #print("[real checkmate debug]")
+        #print("side =", side)
+        #print("is_checkmate =", is_checkmate)
+        #print("has_legal_move =", has_legal_move)
+
+        return is_checkmate and not has_legal_move
+
+    def _has_any_legal_move(self, side: str) -> bool:
+        board = self.position.get_board()
+
+        # 盤上の駒を動かす合法手
+        for square, piece in board.items():
+            if piece is None:
+                continue
+
+            if not self._is_own_piece(piece, side):
+                continue
+
+            legal_moves = self.position.get_legal_moves_from(square)
+            if legal_moves:
+                return True
+
+        # 持ち駒を打つ合法手
+        hands = self.position.get_hands()
+        side_hands = hands.get(side, {})
+
+        empty_squares = [
+            square
+            for square, piece in board.items()
+            if piece is None
+        ]
+
+        for piece, count in side_hands.items():
+            try:
+                count_int = int(count)
+            except (TypeError, ValueError):
+                continue
+
+            if count_int <= 0:
+                continue
+
+            for square in empty_squares:
+                move = Move(
+                    from_square=None,
+                    to_square=square,
+                    promote=False,
+                    drop_piece=piece,
+                )
+
+                if self.position.is_legal_move(move):
+                    return True
+
+        return False
+
+
+    def _is_own_piece(self, piece: str, side: str) -> bool:
+        if hasattr(rules, "get_piece_side"):
+            return rules.get_piece_side(piece) == side
+
+        body = piece[1:] if piece.startswith("+") else piece
+        piece_side = "black" if body.isupper() else "white"
+        return piece_side == side
         
     def undo_move(self) -> bool:
         return self.undo_moves(1) > 0
